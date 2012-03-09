@@ -1,0 +1,2 @@
+The malloc in my trivial C thing tries brk (sbrk), if that fails it resorts to
+mmap2 anonymous
