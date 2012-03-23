@@ -5,8 +5,8 @@
 
 //#include <sys/mman.h>
 
-#define MEM_OK 0
-#define MEM_ERR_ARG 1
+#include "basfunc.h"
+
 
 size_t bytes_from_bits(size_t bits){
   size_t bs = 1;
@@ -41,13 +41,15 @@ int reserve_single(void *addr, size_t sz_bits){
   return MEM_ERR_ARG;
 }
 
-int reserve_range(void *addr, size_t bytes){
+int reserve_range(void *addr, size_t bytes, enum e_perms perm){
   size_t pages;
   void* startaddr = addr;
   size_t sz_bits = mem_bits_from_bytes(bytes);
   size_t i;
 
-  if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)) return reserve_single(addr, sz_bits);
+  if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
+    return reserve_single(addr, sz_bits);
+  }
   pages = bytes / maxpagebytes;
   for (i=0;i<pages;i++){
     int err = reserve_single(addr, maxpagebits);
@@ -56,20 +58,18 @@ int reserve_range(void *addr, size_t bytes){
     addr += maxpagebytes;
   }
   i = bytes % maxpagebytes;
-  if (i) {
+  if (i) { //check off by one error?
     return reserve_single(addr, mem_bits_from_bytes(i));
   }
+
+  //What protection is wanted is told in perms, however, setting these...
   //mprotect(startaddr, bytes, PROT_NONE);
   return MEM_OK;
 }
 
 
 
-int main(void){
-  void (*fnp)(void) = 0x5000000000000000;
-  reserve_range((void*)fnp,0x42000000);
-
-  (*fnp)();
-
+int test_basfunc(void){//upper limit 2^63-1
+  reserve_range((void*)0x9000000000000000,0x42000000, 0);
   svp_abort();
 }
