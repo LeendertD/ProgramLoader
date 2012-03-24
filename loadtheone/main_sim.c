@@ -22,6 +22,7 @@
 
 int main(int argc, char **argv){
   char *fname = NULL;
+  char *pfname = NULL;
   int fin = -1;
   off_t fsize = 0;
   char *data = NULL;
@@ -31,15 +32,22 @@ int main(int argc, char **argv){
   size_t sr;
   off_t toread;
   int err;
+  int verbose = 1;
 
   if (sizeof(ssize_t) != sizeof(off_t)){
     fprintf(stderr, "Warning, size missmatch %d,%d\n",
                      sizeof(ssize_t), sizeof(off_t));
   }
 
-  if (argc == 2){
+  switch (argc){
+    case 2:
     fname = argv[1];
-  } else {
+    break;
+    case 3:
+    fname = argv[1];
+    pfname = argv[2];
+    break;
+    default:
     printf("No file to load\n");
     return 0;
   }
@@ -92,7 +100,18 @@ int main(int argc, char **argv){
   fin = -1;
   /*File closed*/
 
-  if (elf_loadprogram(fdata, fsize, 1)){
+  if (pfname){
+    if (verbose) fprintf(stderr, "Loading patchfile %s\n", pfname);
+    fin = open(pfname, O_RDONLY);
+    if (-1 == fin) fprintf(stderr, "patchfile not open\n");
+    if (read(fin,NULL,0)){
+      fprintf(stderr, "patchfile not open\n");
+      close(fin);
+      fin = -1;
+    }
+  }
+
+  if (elf_loadprogram(fdata, fsize, verbose, fin)){
     fprintf(stderr, "Elf failure\n");
   }
 

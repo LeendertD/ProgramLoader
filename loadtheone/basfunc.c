@@ -17,9 +17,15 @@
 #include <svp/abort.h>
 #include <assert.h>
 
-
+#include <string.h>
+#include <stdint.h>
 #include "basfunc.h"
 #include "loader.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 size_t bytes_from_bits(size_t bits){
   size_t bs = 1;
@@ -79,6 +85,19 @@ int reserve_range(void *addr, size_t bytes, enum e_perms perm){
 }
 
 
+void patcher_zero(char *start, size_t size){
+  memset(start, 0, size);
+}
+void patcher_patch(char *start, size_t count, char *src, size_t len){
+  while (count >0){
+    fprintf(stderr, "PATCH %p,from %p, size %p\n",
+        (void*)start,(void*)src,(void*)len);
+    memcpy(start, src, len);
+    start += len;
+    count--;
+  }
+}
+
 int fakemain(int arg, char **argv, char *anv){
   fprintf(stderr, "FAKEMAIN\n");
   return 42;
@@ -97,8 +116,10 @@ sl_def(thread_function,,
   char *e = sl_getp(e);
   
   int exit_code = (*f)(ac, av, e);
-  //int exit_code = fakemain(ac, av, e);
 
+  //stdin,out, all others here?
+
+  //int exit_code = fakemain(ac, av, e);
   if (exit_code != 0){
     /* Some feedback about termination */
     fprintf(stderr, "program terminated with code %d\n", exit_code);
@@ -111,11 +132,13 @@ sl_enddef
 void function_spawn(main_function_t * main_f){
 
  
-  // nieuwe thread aanmaken die main_f draait
-  char *arg = "HOI";
+  // Placeholder for function argument determination
+  char *arg = strdup("HOI");
   char **argv = &arg;
   int argc = 1;
-  char *envp = "a\0\0";
+  uint32_t env = 0x00000000;
+  char *envp = (char*) (&env);
+  
 
   // optie 1 (synchroon):
   //sl_create( , , , , , , , thread_function, 
@@ -136,6 +159,7 @@ void function_spawn(main_function_t * main_f){
   //sl_spawnsync(f);
 
 
+  /*Create, run PROFIT*/
   // optie 3 (asynchroon, nooit gesynchroniseerd)
   sl_create( , , , , , , , thread_function, 
     sl_glarg(main_function_t* ,, main_f),

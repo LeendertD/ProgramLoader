@@ -6,7 +6,7 @@
 #include "ELF.h"
 #include "basfunc.h"
 #include "loader.h"
-
+#include <unistd.h>
 
 int elf_header_marshall(char *dstart, size_t size){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
@@ -189,20 +189,122 @@ int elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
       
     fprintf(stderr, "Loaded %s ELF binary with virtual base %p entry point %p\n",
         type, (void*)base, (void*)base + ehdr->e_entry);
-    //clog << msg_prefix << ": loaded " << type << " ELF binary with virtual base address 0x" << hex << base
-    //     << ", entry point at 0x" << hex << ehdr.e_entry << endl;
   }
 
-  //RUN THE THING
-  function_spawn((main_function_t*) ((char*)base + ehdr->e_entry));
 
   //return make_pair(ehdr.e_entry, ehdr.e_machine == MACHINE_LEGACY);
 
   return 0;
 }
 
+int elf_runpatches(char *mstart, size_t size, int verbose,
+                   int patch_fd){
+  char abuffer[128] = {0};
+  char mbuffer[128] = {0};
+  char vbuffer[128] = {0};
+  int state = 0;
+  int cnt;
+
+  if (patch_fd == -1) return 0;
+  if (verbose) fprintf(stderr, "Patchfile found\n");
+
+  while (1){
+    char *tgt = NULL;
+    char buf;
+  
+    if (1 != read(patch_fd, &buf, 1)){
+      if (verbose) perror("End of patchfile, or error\n");
+      return 0;
+    }
+    switch (state){
+      case 0:
+        tgt = abuffer + cnt++;
+        if (buf == '='){
+          state++;
+          cnt = 0;
+          break;
+        }
+        tgt[0] = buf;
+        tgt[1] = 0;
+        break;
+      case 1:
+        tgt = mbuffer + cnt++;
+        if (buf == '='){
+          state++;
+          cnt = 0;
+          break;
+        }
+        tgt[0] = buf;
+        tgt[1] = 0;
+        break;
+      case 2:
+        tgt = vbuffer + cnt++;
+        if (buf == '\n'){
+          uint64_t pnt = 0;
+          Elf_Addr addr_start = 0;
+          unsigned char *dbuf = NULL;
+          size_t len_size;
+          char *cr;
+          unsigned char *dr;
+          pnt = strtoul(abuffer, NULL,0);
+          addr_start = pnt;
+          pnt = strtoul(mbuffer, NULL,0);
+          len_size = pnt;
+          dbuf = malloc(len_size + 8 /*dirty fix for printing the first 8 bytes*/);
+
+          dr = dbuf;
+          cr = vbuffer;
+          while (pnt > 0){
+            char *nc = NULL;
+            *dr = (unsigned char) strtoul(cr, &nc, 0);
+            dr++;
+            if (nc[0] == ' '){
+              cr = nc + 1;
+            } else if (nc[0] == 0){
+              break;
+            } else {
+              cr = nc;
+            }
+            pnt--;
+          }
+
+          state = 0;
+          cnt = 0;
+          //PATCHME
+          if (verbose) fprintf(stderr, "Patching. %s<%s> -> %s\n", abuffer, mbuffer, vbuffer);
+          if (verbose) fprintf(stderr, "Patching: %p<%p> -> %p\n", (void*)addr_start, (void*)len_size,
+              (void*)(* (uint64_t*)dbuf));
+          patcher_patch(mstart + addr_start, 1, dbuf, len_size);
+          free(dbuf);
+          abuffer[0] = mbuffer[0] = vbuffer[0] = 0;
+          break;
+        }
+        tgt[0] = buf;
+        tgt[1] = 0;
+        break;
+      default:
+        return 1;
+    }
+  }
+
+  return 0;
+}
+
+
+int elf_spawn(char *dstart, size_t size, Elf_Addr base, 
+              int verbose){
+
+  struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
+  if (verbose) fprintf(stderr, "Spawning program\n");
+  //RUN THE THING
+  function_spawn((main_function_t*) ((char*)base + ehdr->e_entry));
+  //function_spawn((main_function_t*) ((char*)base + /*FAKE ENTRY, MAIN*/ 0x1000004));
+  return 0;
+}
+
 // Load the program image into the memory
-int elf_loadprogram(char* data, size_t size, int verbose){
+int elf_loadprogram(char* data, size_t size, int verbose,
+                    int patch_fd){
   Elf_Addr base;
   
   if (elf_header_marshall(data,size)){
@@ -219,17 +321,29 @@ int elf_loadprogram(char* data, size_t size, int verbose){
   }
 
   base = elf_findbase_marshallphdr(data, size);
-  fprintf(stderr, "B0: %p\n", (void*)base);
+  if (verbose) fprintf(stderr, "base_file: %p\n", (void*)base);
   //Is this Allignment? won't it damage something?
   static const int PAGE_SIZE = 4096;
   base = base & -PAGE_SIZE;
-  base = base | 0x1000000000000000;
+  base = base | 0x1000000000000000;//Move it out of existing mem
+  if (verbose) fprintf(stderr, "base_used: %p\n", (void*)base);
 
-  fprintf(stderr, "B1: %p\n", (void*)base);
+
+
   if (elf_loadit(data, size, base, verbose)){
     fprintf(stderr, "Elf loading failed\n");
     return -1;
   }
+  if (elf_runpatches((char*)base, size, verbose, patch_fd)){
+    fprintf(stderr, "Patching problem\n");
+    return -1;
+  }
+  
+  if (elf_spawn(data, size, base, verbose)){
+    fprintf(stderr, "Elf spawning failed\n");
+    return -1;
+  }
+
 
   return  0;
 }

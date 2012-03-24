@@ -11,6 +11,6 @@
 //
 typedef int (main_function_t)(int argc, char **argv, char *envp);
 void function_spawn(main_function_t * main_f);
-int elf_loadprogram(char*, size_t, int);
+int elf_loadprogram(char*, size_t, int, int fd);
 #endif
 
