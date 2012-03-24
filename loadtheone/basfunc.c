@@ -1,12 +1,25 @@
+/**
+ *  Leendert van Duijn
+ *  UvA
+ *
+ *  Functions used in support of loading programs.
+ *
+ *
+ **/
+
+
+
+
+#include <stdio.h>
+
 #include <svp/mgsim.h>
 #include <stddef.h>
 #include <svp/abort.h>
 #include <assert.h>
 
-//#include <sys/mman.h>
 
 #include "basfunc.h"
-
+#include "loader.h"
 
 size_t bytes_from_bits(size_t bits){
   size_t bs = 1;
@@ -16,22 +29,8 @@ size_t bytes_from_bits(size_t bits){
 
 #define minpagebits ((size_t)  12)
 #define maxpagebits ((size_t)  19)
-/*..pagebits could not be static const, due to compiler errors in the bytes
- * calculation*/
 static const size_t minpagebytes = (size_t)1 << minpagebits; 
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
-
-
-size_t mem_bits_from_bytes(size_t bytes){
-  size_t bits;
-  assert(! (bytes % minpagebytes));
-  bytes = bytes >> minpagebits;
-  while (bytes){
-    bytes = bytes > 1;
-    bits++;
-  }
-  return bits + minpagebits;
-}
 
 int reserve_single(void *addr, size_t sz_bits){
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
@@ -44,10 +43,16 @@ int reserve_single(void *addr, size_t sz_bits){
 int reserve_range(void *addr, size_t bytes, enum e_perms perm){
   size_t pages;
   void* startaddr = addr;
-  size_t sz_bits = mem_bits_from_bytes(bytes);
+  size_t sz_bits = 1;
   size_t i;
+  size_t bbytes = bytes >> 1;
+ 
+  while (bbytes > 0){
+    bbytes = bbytes >> 1;
+    sz_bits++;
+  }
 
-  if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
+  if ((bytes >= minpagebytes ) && (bytes <= maxpagebytes)){
     return reserve_single(addr, sz_bits);
   }
   pages = bytes / maxpagebytes;
@@ -58,8 +63,14 @@ int reserve_range(void *addr, size_t bytes, enum e_perms perm){
     addr += maxpagebytes;
   }
   i = bytes % maxpagebytes;
-  if (i) { //check off by one error?
-    return reserve_single(addr, mem_bits_from_bytes(i));
+  if (i) { 
+    sz_bits = 1;
+    i = i >> 1;
+    while (i > 0){
+      i = i >> 1;
+      sz_bits++;
+    }
+    return reserve_single(addr, sz_bits);
   }
 
   //What protection is wanted is told in perms, however, setting these...
@@ -68,8 +79,71 @@ int reserve_range(void *addr, size_t bytes, enum e_perms perm){
 }
 
 
-
-int test_basfunc(void){//upper limit 2^63-1
-  reserve_range((void*)0x9000000000000000,0x42000000, 0);
-  svp_abort();
+int fakemain(int arg, char **argv, char *anv){
+  fprintf(stderr, "FAKEMAIN\n");
+  return 42;
 }
+
+/* This is the skeleton which boots a new program */
+sl_def(thread_function,,
+               sl_glparm(main_function_t* , f),
+               sl_glparm(int, ac),
+               sl_glparm(char**,  av),
+               sl_glparm(char*, e)
+    ){
+  main_function_t *f = sl_getp(f);
+  int ac = sl_getp(ac);
+  char **av = sl_getp(av);
+  char *e = sl_getp(e);
+  
+  int exit_code = (*f)(ac, av, e);
+  //int exit_code = fakemain(ac, av, e);
+
+  if (exit_code != 0){
+    /* Some feedback about termination */
+    fprintf(stderr, "program terminated with code %d\n", exit_code);
+  }
+
+  fprintf(stderr, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
+}
+sl_enddef
+
+void function_spawn(main_function_t * main_f){
+
+ 
+  // nieuwe thread aanmaken die main_f draait
+  char *arg = "HOI";
+  char **argv = &arg;
+  int argc = 1;
+  char *envp = "a\0\0";
+
+  // optie 1 (synchroon):
+  //sl_create( , , , , , , , thread_function, 
+  //         sl_glarg(main_function_t* ,, main_f),
+  //         sl_glarg(int, , argc),
+  //         sl_glarg(char**, , argv),
+  //         sl_glarg(char*, , envp)
+  //  );
+  //sl_sync();
+  // optie 2 (asynchroon, met plan om later te synchroneseren):
+  //sl_spawndecl(f);
+  //sl_spawn(f, , , , , , , thread_function,
+  //           sl_glarg(main_function_t* ,, main_f),
+  //           sl_glarg(int, , argc),
+  //           sl_glarg(char**, , argv),
+  //           sl_glarg(char*, , envp)); 
+  // dan elders: 
+  //sl_spawnsync(f);
+
+
+  // optie 3 (asynchroon, nooit gesynchroniseerd)
+  sl_create( , , , , , , , thread_function, 
+    sl_glarg(main_function_t* ,, main_f),
+    sl_glarg(int, , argc),
+    sl_glarg(char**, , argv),
+    sl_glarg(char*, , envp)
+  );
+  sl_detach();
+}
+
+

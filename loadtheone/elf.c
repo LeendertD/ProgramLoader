@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <string.h>
+
 #include "ELF.h"
 #include "basfunc.h"
 #include "loader.h"
@@ -113,16 +115,20 @@ Elf_Addr elf_findbase_marshallphdr(char *dstart, size_t size){
   return base;
 }
 
-void elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
+int elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   struct Elf_Phdr *phdr = (struct Elf_Phdr*) (dstart + ehdr->e_phoff);
   
   Elf_Half i;
+
+  if (verbose) fprintf(stderr, "Trying to load: %p size %p @ %p\n", (void*)dstart, (void*)size, (void*)base);
+
   // Then copy the LOAD segments into their right locations
   for (i=0; i < ehdr->e_phnum; ++i){
     if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0){
       Verify(phdr[i].p_memsz >= phdr[i].p_filesz,
           "file has an invalid segment");
+      char *act_addr;
             
       int perm = 0;
       if (phdr[i].p_flags & PF_R) perm |= perm_read;
@@ -134,7 +140,6 @@ void elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
             
       if (phdr[i].p_filesz > 0){
         //Segment containing payload
-        
         Verify(phdr[i].p_offset + phdr[i].p_filesz <= size,
             "file has an invalid segment");
         /*ActiveROM::LoadableRange r;
@@ -145,19 +150,35 @@ void elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
         r.perm = (IMemory::Permissions)perm;
         ranges.push_back(r);
         */
-        // We do not reserve here because this
-        // will be taken care of by the ActiveROM during loading.
+
+        act_addr = ((char*)base) + phdr[i].p_vaddr;
+
+        if (verbose) fprintf(stderr, "load F: %d_%d: size %p,%p @ %p with %d\n", phdr[i].p_type, i,
+          (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
+        //reserve, prepare data
+        reserve_range(act_addr, phdr[i].p_memsz, perm);
+        memcpy(act_addr, dstart + phdr[i].p_offset, phdr[i].p_filesz);
+        if (phdr[i].p_filesz < phdr[i].p_memsz){
+          //beyond the supplied data, 0 as per spec
+          memset(act_addr + phdr[i].p_filesz, 0, phdr[i].p_memsz - phdr[i].p_filesz-1);
+        }
+
+        //LOADING HERE SEEMS NEEDED
         if (verbose){
-          //LOADING HERE SEEMS NEEDED
-          fprintf(stderr, "Loader %d bytes loaded at 0x%x\n",phdr[i].p_filesz, phdr[i].p_vaddr);
+          fprintf(stderr, "Loader %p bytes loaded at %p\n",(void*) phdr[i].p_filesz,(void*) act_addr);
           //clog << msg_prefix << ": " << dec << phdr[i].p_filesz << " bytes loadable at virtual address 0x" << hex << phdr[i].p_vaddr << endl;
         }
       } else {
-        //segment that needs reservation, 2 types exist, init and non init
-        reserve_range((void*)phdr[i].p_vaddr, phdr[i].p_memsz, perm);
+        act_addr = ((char*)base) + phdr[i].p_vaddr;
+
+        if (verbose) fprintf(stderr, "load U: %d: %p size %p,%p @ %p\n with %d", phdr[i].p_type, i,
+          (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
+        //segment that needs reservation, 2 types exist?
+        reserve_range((void*)act_addr, phdr[i].p_memsz, perm);
+        
         //memory.Reserve(phdr[i].p_vaddr, phdr[i].p_memsz, perm);
         if (verbose){
-          fprintf(stderr, "Loader reserved %d bytes at 0x%x\n", phdr[i].p_memsz, phdr[i].p_vaddr);
+          fprintf(stderr, "Loader reserved %p bytes at %p\n",(void*) phdr[i].p_memsz,(void*) act_addr);
           //clog << msg_prefix << ": " << dec << phdr[i].p_memsz << " bytes reserved at virtual address 0x" << hex << phdr[i].p_vaddr << endl;
         }
       }
@@ -166,17 +187,18 @@ void elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
   if (verbose){
     const char* type = (ehdr->e_machine == MACHINE_LEGACY)? "legacy":"microthreaded";
       
-    fprintf(stderr, "Loaded %s ELF binary with virtual base 0x%x entry point 0x%x\n",
-        type, base, ehdr->e_entry);
+    fprintf(stderr, "Loaded %s ELF binary with virtual base %p entry point %p\n",
+        type, (void*)base, (void*)base + ehdr->e_entry);
     //clog << msg_prefix << ": loaded " << type << " ELF binary with virtual base address 0x" << hex << base
     //     << ", entry point at 0x" << hex << ehdr.e_entry << endl;
   }
 
   //RUN THE THING
+  function_spawn((main_function_t*) ((char*)base + ehdr->e_entry));
 
   //return make_pair(ehdr.e_entry, ehdr.e_machine == MACHINE_LEGACY);
 
-
+  return 0;
 }
 
 // Load the program image into the memory
@@ -197,12 +219,18 @@ int elf_loadprogram(char* data, size_t size, int verbose){
   }
 
   base = elf_findbase_marshallphdr(data, size);
-
+  fprintf(stderr, "B0: %p\n", (void*)base);
   //Is this Allignment? won't it damage something?
   static const int PAGE_SIZE = 4096;
   base = base & -PAGE_SIZE;
+  base = base | 0x1000000000000000;
 
-  elf_loadit(data, size, base, verbose);
+  fprintf(stderr, "B1: %p\n", (void*)base);
+  if (elf_loadit(data, size, base, verbose)){
+    fprintf(stderr, "Elf loading failed\n");
+    return -1;
+  }
 
+  return  0;
 }
 
