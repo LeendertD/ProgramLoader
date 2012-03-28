@@ -90,16 +90,15 @@ int main_prog(char *fname, char *pfname, Elf_Addr base_s){
     }
   }
 
-  if (elf_loadprogram(fdata, fsize, verbose, fin, base_s * 1)){
+  //Load
+  if (elf_loadprogram(fdata, fsize, verbose, fin, base_s)){
     fprintf(stderr, "Elf failure\n");
   }
-  if (elf_loadprogram(fdata, fsize, verbose, fin, base_s * 2)){
-    fprintf(stderr, "Elf failure\n");
-  }
-
-  
+    
   return 0;
 }
+
+
 int main(int argc, char **argv){
   char *fname;
   char *pfname;
@@ -111,20 +110,19 @@ int main(int argc, char **argv){
                      sizeof(ssize_t), sizeof(off_t));
   }
 
+  //Not interested in program name of 'this' program
   argc--;
+  argv++;
   for (i=0;i<(argc>>1); i++){
-    main_prog(argv[i], argv[i;
-    break;
-    case 3:
-    fname = argv[1];
-    pfname = argv[2];
-    break;
-    default:
-    printf("No file to load\n");
-    return 0;
+    main_prog(argv[i<<1], argv[ 1 +(i<<1)], base_s * (1+i));
   }
 
-  main_prog(fname, pfname, base_s * i);
+  //Check whether any arguments where processed
+  if (i==0){
+    printf("No file to load\n");
+  }
+
+
   /*???  more loading, debug wait, ???*/
 
   printf("Returning from Loader main\n");
