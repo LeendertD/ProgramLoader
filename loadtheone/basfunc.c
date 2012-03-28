@@ -105,6 +105,14 @@ int fakemain(int arg, char **argv, char *anv){
   return 42;
 }
 
+extern int spawn(const char *programma, int argc, char **argv, char *env) 
+{
+  // FIXME: implement a real spawn here.
+  fprintf(stderr, "hello from spawn\n");
+  return 0;
+}
+
+
 /* This is the skeleton which boots a new program */
 sl_def(thread_function,,
                sl_glparm(main_function_t* , f),
@@ -116,8 +124,8 @@ sl_def(thread_function,,
   int ac = sl_getp(ac);
   char **av = sl_getp(av);
   char *e = sl_getp(e);
-  
-  int exit_code = (*f)(ac, av, e);
+  void *p = &spawn;
+  int exit_code = (*f)(p, ac, av, e);
 
   //stdin,out, all others here?
 
@@ -135,9 +143,8 @@ void function_spawn(main_function_t * main_f){
 
  
   // Placeholder for function argument determination
-  char *arg = strdup("HOI");
-  char **argv = &arg;
-  int argc = 1;
+  char *argv[2] = {strdup("a.out"), strdup("HOI"), 0};
+  int argc = 2;
   uint32_t env = 0x00000000;
   char *envp = (char*) (&env);
   

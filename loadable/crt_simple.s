@@ -38,10 +38,10 @@ _start:
         fclr $lf3 # init FP return reg
         clr $l2 # flush arg reg
         clr $l3 # flush arg reg
-        clr $l4 # flush arg reg
-        clr $l5 # flush arg reg
-        clr $l6 # flush arg reg
-        clr $l7 # flush arg reg
+        #Do NOT flush, accept arg.. clr $l4 # flush arg reg
+        #Do NOT flush, accept arg.. clr $l5 # flush arg reg
+        #Do NOT flush, accept arg.. clr $l6 # flush arg reg
+        #Do NOT flush, accept arg.. clr $l7 # flush arg reg
         fclr $lf5 # flush arg reg
         fclr $lf6 # flush arg reg
         fclr $lf7 # flush arg reg
