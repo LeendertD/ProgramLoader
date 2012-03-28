@@ -304,7 +304,7 @@ int elf_spawn(char *dstart, size_t size, Elf_Addr base,
 
 // Load the program image into the memory
 int elf_loadprogram(char* data, size_t size, int verbose,
-                    int patch_fd){
+                    int patch_fd, Elf_Addr base_sug){
   Elf_Addr base;
   
   if (elf_header_marshall(data,size)){
@@ -325,7 +325,7 @@ int elf_loadprogram(char* data, size_t size, int verbose,
   //Is this Allignment? won't it damage something?
   static const int PAGE_SIZE = 4096;
   base = base & -PAGE_SIZE;
-  base = base | 0x1000000000000000;//Move it out of existing mem
+  base = base | base_sug;//Move it out of existing mem
   if (verbose) fprintf(stderr, "base_used: %p\n", (void*)base);
 
 

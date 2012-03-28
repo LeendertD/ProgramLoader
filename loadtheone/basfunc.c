@@ -39,7 +39,7 @@ static const size_t minpagebytes = (size_t)1 << minpagebits;
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
 
 int reserve_single(void *addr, size_t sz_bits){
-  fprintf(stderr, "Reserving %d bits at %p\n", sz_bits, addr);
+  //fprintf(stderr, "Reserving %d bits at %p\n", sz_bits, addr);
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
     mgsim_control(addr, MGSCTL_TYPE_MEM, MGSCTL_MEM_MAP, sz_bits - minpagebits);
     return MEM_OK;

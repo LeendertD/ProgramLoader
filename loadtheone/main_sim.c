@@ -19,10 +19,7 @@
 #include "loader.h"
 
 #define SANE_SIZE sizeof(struct Elf_Ehdr)
-
-int main(int argc, char **argv){
-  char *fname = NULL;
-  char *pfname = NULL;
+int main_prog(char *fname, char *pfname, Elf_Addr base_s){
   int fin = -1;
   off_t fsize = 0;
   char *data = NULL;
@@ -33,24 +30,6 @@ int main(int argc, char **argv){
   off_t toread;
   int err;
   int verbose = 1;
-
-  if (sizeof(ssize_t) != sizeof(off_t)){
-    fprintf(stderr, "Warning, size missmatch %d,%d\n",
-                     sizeof(ssize_t), sizeof(off_t));
-  }
-
-  switch (argc){
-    case 2:
-    fname = argv[1];
-    break;
-    case 3:
-    fname = argv[1];
-    pfname = argv[2];
-    break;
-    default:
-    printf("No file to load\n");
-    return 0;
-  }
 
   printf("Loading %s\n", fname);
   fin = open(fname, O_RDONLY);
@@ -111,12 +90,43 @@ int main(int argc, char **argv){
     }
   }
 
-  if (elf_loadprogram(fdata, fsize, verbose, fin)){
+  if (elf_loadprogram(fdata, fsize, verbose, fin, base_s * 1)){
+    fprintf(stderr, "Elf failure\n");
+  }
+  if (elf_loadprogram(fdata, fsize, verbose, fin, base_s * 2)){
     fprintf(stderr, "Elf failure\n");
   }
 
-  /*???  more loading, debug wait, ???*/
   
+  return 0;
+}
+int main(int argc, char **argv){
+  char *fname;
+  char *pfname;
+  Elf_Addr base_s = 0x1000000000000000;
+  int i;
+
+  if (sizeof(ssize_t) != sizeof(off_t)){
+    fprintf(stderr, "Warning, size missmatch %d,%d\n",
+                     sizeof(ssize_t), sizeof(off_t));
+  }
+
+  argc--;
+  for (i=0;i<(argc>>1); i++){
+    main_prog(argv[i], argv[i;
+    break;
+    case 3:
+    fname = argv[1];
+    pfname = argv[2];
+    break;
+    default:
+    printf("No file to load\n");
+    return 0;
+  }
+
+  main_prog(fname, pfname, base_s * i);
+  /*???  more loading, debug wait, ???*/
+
   printf("Returning from Loader main\n");
   return 0;
 }
