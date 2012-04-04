@@ -1,15 +1,16 @@
 #include <svp/testoutput.h>
-int test(void *p, int argc, char **argv, char*env){
+
+#include "../loadtheone/loader_api.h"
+
+int test(int argc, char **argv, char *env, struct loader_api_s *api){
+  int (*s)(const char*,enum e_settings, int,char**,char*);
+  s = api->spawn;
+
 
   /*Use as argument, unrelated to argv...*/
-  if (argc > 1) {
-    output_string(argv[1],2);
-    output_char('\n',2);
-  }
-  //output_string("hello world\n", 1);
-  void (*s)(char*,int,char**,char*);
-  s = p;
-  /*Call 'me' with other args*/
-  (*s)(argv[0], argc-1, argv, env);
-  return 0;
+  output_string("hello world\n", 1);
+  output_int(argc, 1);
+  output_int((long)argv, 1);
+  output_int((long)env, 1);
+  return 0; 
 }

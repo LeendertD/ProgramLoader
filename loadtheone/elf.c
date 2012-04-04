@@ -2,11 +2,142 @@
 #include <stdlib.h>
 
 #include <string.h>
+#include <unistd.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+
+#include <errno.h>
 #include "ELF.h"
 #include "basfunc.h"
 #include "loader.h"
 #include <unistd.h>
+
+
+int stupidcounter = 1;
+Elf_Addr base_off = 0x0010000000000000;
+
+sl_def(slbase_fn,, sl_glparm(Elf_Addr*, basep)){
+  Elf_Addr *val = sl_getp(basep);
+  *val = stupidcounter * base_off;
+  stupidcounter++;
+}
+sl_enddef
+
+Elf_Addr locked_newbase(void){
+  Elf_Addr val;
+  sl_create(, MAKE_CLUSTER_ADDR(3, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(Elf_Addr*, basep, &val));
+  sl_sync();
+
+  return val;
+}
+
+void locked_delbase(Elf_Addr adr){
+  ////
+  (void)adr;
+}
+
+#define SANE_SIZE sizeof(struct Elf_Ehdr)
+int elf_loadfile(const char *fname, enum e_settings flags,
+              int argc, char **argv, char* env){
+  int fin = -1;
+  size_t fsize = 0;
+  struct stat fstatus;
+  void *fdata = NULL;
+  size_t r;
+  size_t sr;
+  off_t toread;
+  int verbose = flags & e_verbose;
+  char buff[1024];
+
+  if (verbose) {
+    snprintf(buff, 1023,"Loading %s\n", fname);
+    locked_print_string(buff, PRINTERR);
+  }
+  fin = open(fname, O_RDONLY);
+
+  if (-1 == fin){
+    const char *err = strerror(errno);
+    snprintf(buff, 1023, "File could not be opened: %s\n", err);
+    locked_print_string(buff, PRINTERR);
+    return 0;
+  }
+  if (fstat(fin, &fstatus)) {
+    const char *err = strerror(errno);
+    snprintf(buff, 1023, "File not statted %s: %s\n", fname, err);
+    locked_print_string(buff, PRINTERR);
+    return 0;
+  }
+  fsize = fstatus.st_size;
+  if (fsize < SANE_SIZE){
+    locked_print_string("Filesize too small, not a valid file\n", PRINTERR);
+    return 0;
+  }
+  if (verbose) locked_print_string("File opened\n", PRINTERR);
+  fdata = malloc(fsize);
+
+  //current offset
+  sr = 0;
+  toread = fsize;
+  while (toread > 0){
+    errno = 0;
+    //read, hoping the offset gets incemented
+    r = read(fin, fdata + sr, fsize);
+    if (r != fsize){
+      if (errno == 0){//No error, incomplete read
+        //Interrupts are fine, as long as progress could be made
+        toread -= r;
+        sr += r;
+        continue;
+      }
+      const char *err = strerror(errno);
+      snprintf(buff, 1023, "Read error: %s, %d of %d read\n",
+                       err, (int)r, (int)fsize);
+      locked_print_string(buff, PRINTERR);
+      return 0;
+    }
+  }
+  if (verbose) locked_print_string("File read\n", PRINTERR);
+
+  /*Data done, close file*/
+  if (verbose) locked_print_string("Closing file\n", PRINTERR);
+  close(fin);
+  fin = -1;
+  /*File closed*/
+
+  /* Patcher, unused
+  if (pfname){
+    if (verbose) fprintf(stderr, "Loading patchfile %s\n", pfname);
+    fin = open(pfname, O_RDONLY);
+    if (-1 == fin) fprintf(stderr, "patchfile not open\n");
+    if (read(fin,NULL,0)){
+      fprintf(stderr, "patchfile not open\n");
+      close(fin);
+      fin = -1;
+    }
+  }
+  */
+  //Load
+  
+  if ((argc > 0) &&
+      !(flags & e_noprogname)
+     ){
+    argv[0] = (char*)fname;
+  }
+  //
+
+  if (elf_loadprogram(fdata, fsize, verbose,
+        flags,
+        argc,argv,env
+        )){
+    locked_print_string("Elf failure\n", PRINTERR);
+  }
+    
+  return 0;
+}
+
 
 int elf_header_marshall(char *dstart, size_t size){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
@@ -32,6 +163,12 @@ int elf_header_marshall(char *dstart, size_t size){
 
 int elf_header_check(char *dstart, size_t size){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
+
+  if ((dstart + size) < (char*)(& ehdr->e_ident[EI_MAG3])) {
+    locked_print_string("Header problem, size too low\n", PRINTERR);
+    return -1; // Data too short for reading
+  }
+
   // Check file signature
   if (ehdr->e_ident[EI_MAG0] == ELFMAG0 &&
          ehdr->e_ident[EI_MAG1] == ELFMAG1 &&
@@ -39,7 +176,7 @@ int elf_header_check(char *dstart, size_t size){
          ehdr->e_ident[EI_MAG3] == ELFMAG3){
     return 0;
   } else {
-    fprintf(stderr, "invalid ELF file signature");
+    locked_print_string("invalid ELF file signature", PRINTERR);
     return -1;
   }
 }
@@ -48,36 +185,36 @@ int elf_header_check_arch(char *dstart, size_t size){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   // Check that this file is for our 'architecture'
   if (ehdr->e_ident[EI_VERSION] != EV_CURRENT){
-    fprintf(stderr, "ELF version mismatch");
+    locked_print_string("ELF version mismatch", PRINTERR);
     return -1;
   }
   if (ehdr->e_ident[EI_CLASS] != ELFCLASS){
-    fprintf(stderr, "file is not of proper bitsize");
+    locked_print_string("file is not of proper bitsize", PRINTERR);
     return -1;
   }
   if (ehdr->e_ident[EI_DATA] != ELFDATA){
-    fprintf(stderr, "file is not of proper endianness");
+    locked_print_string("file is not of proper endianness", PRINTERR);
     return -1;
   }
   if (! (ehdr->e_machine == MACHINE_NORMAL ||
          ehdr->e_machine == MACHINE_LEGACY)){
-    fprintf(stderr, "target architecture is not supported");
+    locked_print_string("target architecture is not supported", PRINTERR);
     return -1;
   }
   if (ehdr->e_type != ET_EXEC){
-    fprintf(stderr, "file is not an executable file");
+    locked_print_string("file is not an executable file", PRINTERR);
     return -1;
   }
   if (ehdr->e_phoff == 0 || ehdr->e_phnum == 0){
-    fprintf(stderr, "file has no program header");
+    locked_print_string("file has no program header", PRINTERR);
     return -1;
   }
   if (ehdr->e_phentsize != sizeof(struct Elf_Phdr)){
-    fprintf(stderr, "file has an invalid program header");
+    locked_print_string("file has an invalid program header", PRINTERR);
     return -1;
   }
   if (! (ehdr->e_phoff + ehdr->e_phnum * ehdr->e_phentsize <= size)){
-    fprintf(stderr, "file has an invalid program header");
+    locked_print_string("file has an invalid program header", PRINTERR);
     return -1;
   }
   return 0;
@@ -97,6 +234,8 @@ Elf_Addr elf_findbase_marshallphdr(char *dstart, size_t size){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   struct Elf_Phdr *phdr = (struct Elf_Phdr*) (dstart + ehdr->e_phoff);
 
+  (void) size; // A check could be added
+
   // Determine base address and check for loadable segments
   int hasLoadable = 0;
   Elf_Addr base = 0;
@@ -115,13 +254,19 @@ Elf_Addr elf_findbase_marshallphdr(char *dstart, size_t size){
   return base;
 }
 
-int elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
+int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbose){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   struct Elf_Phdr *phdr = (struct Elf_Phdr*) (dstart + ehdr->e_phoff);
+  Elf_Addr base = adminstart->base;
   
   Elf_Half i;
+  char buff[1024];
 
-  if (verbose) fprintf(stderr, "Trying to load: %p size %p @ %p\n", (void*)dstart, (void*)size, (void*)base);
+  if (verbose) {
+    char buff[1024];
+    snprintf(buff, 1023, "Trying to load: %p size %p @ %p\n", (void*)dstart, (void*)size, (void*)base);
+    locked_print_string(buff, PRINTERR);
+  }
 
   // Then copy the LOAD segments into their right locations
   for (i=0; i < ehdr->e_phnum; ++i){
@@ -153,8 +298,12 @@ int elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
 
         act_addr = ((char*)base) + phdr[i].p_vaddr;
 
-        if (verbose) fprintf(stderr, "load F: %d_%d: size %p,%p @ %p with %d\n", phdr[i].p_type, i,
+        if (verbose) {
+          char buff[1024];
+          snprintf(buff, 1023, "load F: %d_%d: size %p,%p @ %p with %d\n", phdr[i].p_type, i,
           (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
+          locked_print_string(buff, PRINTERR);
+        }
         //reserve, prepare data
         reserve_range(act_addr, phdr[i].p_memsz, perm);
         memcpy(act_addr, dstart + phdr[i].p_offset, phdr[i].p_filesz);
@@ -165,21 +314,25 @@ int elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
 
         //LOADING HERE SEEMS NEEDED
         if (verbose){
-          fprintf(stderr, "Loader %p bytes loaded at %p\n",(void*) phdr[i].p_filesz,(void*) act_addr);
-          //clog << msg_prefix << ": " << dec << phdr[i].p_filesz << " bytes loadable at virtual address 0x" << hex << phdr[i].p_vaddr << endl;
+          char buff[1024];
+          snprintf(buff, 1023,"Loader %p bytes loaded at %p\n",(void*) phdr[i].p_filesz,(void*) act_addr);
+          locked_print_string(buff, PRINTERR);
         }
       } else {
         act_addr = ((char*)base) + phdr[i].p_vaddr;
 
-        if (verbose) fprintf(stderr, "load U: %d: %p size %p,%p @ %p\n with %d", phdr[i].p_type, i,
+        if (verbose) {
+          snprintf(buff, 1023, "load U: %d: 0X%x size %p,%p @ %p\n with %d", phdr[i].p_type, i,
           (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
+          locked_print_string(buff, PRINTERR);
+        }
         //segment that needs reservation, 2 types exist?
         reserve_range((void*)act_addr, phdr[i].p_memsz, perm);
         
         //memory.Reserve(phdr[i].p_vaddr, phdr[i].p_memsz, perm);
         if (verbose){
-          fprintf(stderr, "Loader reserved %p bytes at %p\n",(void*) phdr[i].p_memsz,(void*) act_addr);
-          //clog << msg_prefix << ": " << dec << phdr[i].p_memsz << " bytes reserved at virtual address 0x" << hex << phdr[i].p_vaddr << endl;
+          snprintf(buff, 1023, "Loader reserved %p bytes at %p\n",(void*) phdr[i].p_memsz,(void*) act_addr);
+          locked_print_string(buff, PRINTERR);
         }
       }
     }
@@ -187,16 +340,15 @@ int elf_loadit(char *dstart, size_t size, Elf_Addr base, int verbose){
   if (verbose){
     const char* type = (ehdr->e_machine == MACHINE_LEGACY)? "legacy":"microthreaded";
       
-    fprintf(stderr, "Loaded %s ELF binary with virtual base %p entry point %p\n",
+    snprintf(buff, 1023, "Loaded %s ELF binary with virtual base %p entry point %p\n",
         type, (void*)base, (void*)base + ehdr->e_entry);
+    locked_print_string(buff, PRINTERR);
   }
-
-
-  //return make_pair(ehdr.e_entry, ehdr.e_machine == MACHINE_LEGACY);
 
   return 0;
 }
 
+/*
 int elf_runpatches(char *mstart, size_t size, int verbose,
                    int patch_fd){
   char abuffer[128] = {0};
@@ -250,7 +402,7 @@ int elf_runpatches(char *mstart, size_t size, int verbose,
           addr_start = pnt;
           pnt = strtoul(mbuffer, NULL,0);
           len_size = pnt;
-          dbuf = malloc(len_size + 8 /*dirty fix for printing the first 8 bytes*/);
+          dbuf = malloc(len_size + 8 ); //dirty fix for printing the first 8 bytes
 
           dr = dbuf;
           cr = vbuffer;
@@ -288,59 +440,152 @@ int elf_runpatches(char *mstart, size_t size, int verbose,
   }
 
   return 0;
-}
+}*/
 
 
-int elf_spawn(char *dstart, size_t size, Elf_Addr base, 
-              int verbose){
-
+int elf_spawn(char *dstart, size_t size, struct admin_s *adminstart,
+              int verbose, enum e_settings flags,
+              int argc, char **argv, char *envp){
+  Elf_Addr base = adminstart->base;
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
-  if (verbose) fprintf(stderr, "Spawning program\n");
-  //RUN THE THING
-  function_spawn((main_function_t*) ((char*)base + ehdr->e_entry));
-  //function_spawn((main_function_t*) ((char*)base + /*FAKE ENTRY, MAIN*/ 0x1000004));
+  if (verbose) {
+    char buff[1024];
+    snprintf(buff, 1023, "Spawning program from %p of size %p with flags %d\n", (void*)dstart, (void*) size, flags);
+    locked_print_string(buff, PRINTERR);
+  }
+  //fprintf(stdout,"%d:%p: %s@%p\n",argc,(void*)argv, argv[0],(void*)argv[0]);
+  function_spawn((main_function_t*) ((char*)base + ehdr->e_entry),
+      argc, argv, envp
+      );
   return 0;
 }
 
-// Load the program image into the memory
+static size_t strsize(char *in){
+  size_t s = 0;
+  while (in && in[s]){ s++; }
+  return s + 1;//Null byte inc.
+}
+
+Elf_Addr argsize(int argc, char** argv,char * envp){
+  int i=0;
+  size_t si = sizeof(char*) * (1 + argc);
+  //Argv
+  for (i=0;i<argc;i++){
+    si += strsize(argv[i]);
+  }
+
+  i = 0;
+  while (envp && (envp[i] || envp[i+1])){
+    i++;
+    si++;
+  }
+  si += 2;
+
+  return si;
+}
+
+int argsave(Elf_Addr start,struct admin_s *ab,int argc, char** argv,char * envp){
+  int i=0;
+  char **acpp = (char **)start;
+  char *cpnt = (char*) (start + (sizeof(char*) *argc + 1));
+  ab->argc = argc;
+  ab->argv = acpp;
+  //Argv
+  for (i=0;i<argc;i++){
+    int k = 0;
+    acpp[i] = cpnt;//Argv
+    acpp[i+1] = NULL;
+    *cpnt = 0;
+
+    //Now copy the string
+    while (argv && argv[k]){
+      *cpnt = (argv[i])[k];
+      cpnt++;
+      *cpnt = 0;
+      k++;
+    }
+  }
+  cpnt++;
+
+  i = 0;
+  ab->envp = cpnt;
+  while (envp && (envp[i] || envp[i+1])){
+    cpnt[i] = envp[i];
+    i++;
+  }
+  cpnt[i] = 0;
+  cpnt[i+1] = 0;
+
+  return 0;
+}
+
+// Load the program image into the memory,
 int elf_loadprogram(char* data, size_t size, int verbose,
-                    int patch_fd, Elf_Addr base_sug){
-  Elf_Addr base;
+                    enum e_settings flags,
+                    int argc, char **argv, char *envp
+                    ){
+  Elf_Addr base = locked_newbase();
+  Elf_Addr relbase;
+  struct admin_s *adminstart;
+
+  Elf_Addr adminsize = sizeof(struct admin_s) + argsize(argc, argv, envp);
   
   if (elf_header_marshall(data,size)){
-    fprintf(stderr, "Marshalling failed\n");
+    locked_print_string("Marshalling failed\n", PRINTERR);
     return -1;
   }
   if (elf_header_check(data,size)){
-    fprintf(stderr, "Header checking failed\n");
+    locked_print_string("Header checking failed\n", PRINTERR);
     return -1;
   }
   if (elf_header_check_arch(data,size)){
-    fprintf(stderr, "Architecture check failed\n");
+    locked_print_string("Architecture check failed\n", PRINTERR);
     return -1;
   }
 
-  base = elf_findbase_marshallphdr(data, size);
-  if (verbose) fprintf(stderr, "base_file: %p\n", (void*)base);
+  relbase = elf_findbase_marshallphdr(data, size);
+  if (verbose) {
+    char buff[1024];
+    snprintf(buff, 1023, "base_file: %p\n", (void*)base);
+    locked_print_string(buff, PRINTERR);
+  }
   //Is this Allignment? won't it damage something?
   static const int PAGE_SIZE = 4096;
-  base = base & -PAGE_SIZE;
-  base = base | base_sug;//Move it out of existing mem
-  if (verbose) fprintf(stderr, "base_used: %p\n", (void*)base);
+  relbase = relbase & -PAGE_SIZE;
 
+  adminstart = (struct admin_s*)base;
+  //Prepare storage for argv and env
+  base = (Elf_Addr)reserve_range((void*)base, adminsize, perm_read|perm_write);
+  base += relbase;//correct for elf base
+  if (verbose) {
+    char buff[1024];
+    snprintf(buff, 1023, "base_used: %p\n", (void*)base);
+    locked_print_string(buff, PRINTERR);
+  }
 
+  adminstart->base = base;
+  if (argsave(((Elf_Addr)adminstart) + sizeof(struct admin_s),
+              adminstart,
+              argc,
+              argv,
+              envp)){
+    locked_print_string("Problem in argument construction\n", PRINTERR);
+  }
 
-  if (elf_loadit(data, size, base, verbose)){
-    fprintf(stderr, "Elf loading failed\n");
+  if (elf_loadit(data, size, adminstart, verbose)){
+    locked_print_string("Elf loading failed\n", PRINTERR);
     return -1;
   }
+
+  /*Patcher, unused
   if (elf_runpatches((char*)base, size, verbose, patch_fd)){
     fprintf(stderr, "Patching problem\n");
     return -1;
-  }
+  }*/
   
-  if (elf_spawn(data, size, base, verbose)){
-    fprintf(stderr, "Elf spawning failed\n");
+  if (elf_spawn(data, size, adminstart, verbose, flags,
+        adminstart->argc,adminstart->argv,adminstart->envp)){
+    locked_print_string("Elf spawning failed\n", PRINTERR);
     return -1;
   }
 

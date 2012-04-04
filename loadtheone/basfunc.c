@@ -8,7 +8,7 @@
  **/
 
 
-
+#include <svp/testoutput.h>
 
 #include <stdio.h>
 
@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#define PRINTCORE 2
 
 size_t bytes_from_bits(size_t bits){
   size_t bs = 1;
@@ -39,35 +40,40 @@ static const size_t minpagebytes = (size_t)1 << minpagebits;
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
 
 int reserve_single(void *addr, size_t sz_bits){
-  //fprintf(stderr, "Reserving %d bits at %p\n", sz_bits, addr);
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
     mgsim_control(addr, MGSCTL_TYPE_MEM, MGSCTL_MEM_MAP, sz_bits - minpagebits);
-    return MEM_OK;
+    return 0;
   }
-  return MEM_ERR_ARG;
+  return -1;
 }
 
-int reserve_range(void *addr, size_t bytes, enum e_perms perm){
+void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
   size_t pages;
-  void* startaddr = addr;
+  //void* startaddr = addr;
+  
   size_t sz_bits = 1;
   size_t i;
   size_t bbytes = bytes >> 1;
- 
+  size_t resc = 0;
+  
+  //No permissions available for now
+  (void) perm;
+
   while (bbytes > 0){
     bbytes = bbytes >> 1;
     sz_bits++;
   }
 
   if ((bytes >= minpagebytes ) && (bytes <= maxpagebytes)){
-    return reserve_single(addr, sz_bits);
+    if (reserve_single(addr, sz_bits)) return 0;
+    return addr + (1 << sz_bits);
   }
   pages = bytes / maxpagebytes;
   for (i=0;i<pages;i++){
-    int err = reserve_single(addr, maxpagebits);
-    if (err != MEM_OK) return err;
+    if (reserve_single(addr, maxpagebits)) return addr + resc;
 
     addr += maxpagebytes;
+    resc += maxpagebytes;
   }
   i = bytes % maxpagebytes;
   if (i) { 
@@ -78,15 +84,16 @@ int reserve_range(void *addr, size_t bytes, enum e_perms perm){
       sz_bits++;
     }
     if (sz_bits < minpagebits) sz_bits = minpagebits;
-    return reserve_single(addr, sz_bits);
+    if (reserve_single(addr, sz_bits)) return 0;
+    resc += 1 << sz_bits;
   }
 
   //What protection is wanted is told in perms, however, setting these...
   //mprotect(startaddr, bytes, PROT_NONE);
-  return MEM_OK;
+  return addr + resc;
 }
 
-
+/*
 void patcher_zero(char *start, size_t size){
   memset(start, 0, size);
 }
@@ -104,15 +111,7 @@ int fakemain(int arg, char **argv, char *anv){
   fprintf(stderr, "FAKEMAIN\n");
   return 42;
 }
-
-extern int spawn(const char *programma, int argc, char **argv, char *env) 
-{
-  // FIXME: implement a real spawn here.
-  fprintf(stderr, "hello from spawn\n");
-  return 0;
-}
-
-
+*/
 /* This is the skeleton which boots a new program */
 sl_def(thread_function,,
                sl_glparm(main_function_t* , f),
@@ -124,29 +123,30 @@ sl_def(thread_function,,
   int ac = sl_getp(ac);
   char **av = sl_getp(av);
   char *e = sl_getp(e);
-  void *p = &spawn;
-  int exit_code = (*f)(p, ac, av, e);
-
-  //stdin,out, all others here?
-
+  struct loader_api_s *p = &loader_api;
+  
+  char buff[1024];
+  int exit_code = (*f)(ac, av, e, p);
   //int exit_code = fakemain(ac, av, e);
+  
   if (exit_code != 0){
     /* Some feedback about termination */
-    fprintf(stderr, "program terminated with code %d\n", exit_code);
+    snprintf(buff, 1023, "program terminated with code %d\n", exit_code);
+    locked_print_string(buff, PRINTERR);
   }
 
-  fprintf(stderr, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
+  snprintf(buff, 1023, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
+  locked_print_string(buff, PRINTERR);
 }
 sl_enddef
 
-void function_spawn(main_function_t * main_f){
-
- 
+int function_spawn(main_function_t * main_f,
+                    int argc, char **argv, char *envp ){
   // Placeholder for function argument determination
-  char *argv[2] = {strdup("a.out"), strdup("HOI"), 0};
-  int argc = 2;
-  uint32_t env = 0x00000000;
-  char *envp = (char*) (&env);
+  //char *argv[] = {strdup("a.out"), strdup("HOI"), 0};
+  //int argc = 2;
+  //uint32_t env = 0x00000000;
+  //char *envp = (char*) (&env);
   
 
   // optie 1 (synchroon):
@@ -177,6 +177,43 @@ void function_spawn(main_function_t * main_f){
     sl_glarg(char*, , envp)
   );
   sl_detach();
+
+  return 0;
 }
+
+
+//This does not suply nice flags
+int loader_spawn(const char *programma, int argc, char **argv, char *env) {
+  return elf_loadfile(programma, 0, argc ,argv, env);
+}
+
+sl_def(slprintstr_fn,, sl_glparm(const char*, strp), sl_glparm(int, fd)){
+  const char *val = sl_getp(strp);
+  int fdd = sl_getp(fd);
+  output_string(val, fdd);
+}
+sl_enddef
+
+void locked_print_string(const char *stin, int fp){
+  sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintstr_fn, sl_glarg(const char *, strp, stin), sl_glarg(int , fd, fp) );
+  sl_sync();
+}
+
+sl_def(slprintint_fn,, sl_glparm(int, strp), sl_glparm(int, fd)){
+  int val = sl_getp(strp);
+  int fdd = sl_getp(fd);
+  output_int(val, fdd);
+}
+sl_enddef
+
+void locked_print_int(int val, int fp){
+  sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintint_fn, sl_glarg(int, strp, val), sl_glarg(int , fd, fp) );
+  sl_sync();
+}
+struct loader_api_s loader_api = {
+  &elf_loadfile,
+  &locked_print_string,
+  &locked_print_int
+};
 
 
