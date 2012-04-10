@@ -21,6 +21,9 @@ void locked_print_string(const char*, int fp);
 
 struct admin_s {
   Elf_Addr base;
+  char *fname;
+  int core_start;
+  int core_size;
   int argc;
   char **argv;
   char *envp;
@@ -36,7 +39,18 @@ int elf_loadprogram(char*, size_t, int verbose,
     );
 int elf_loadfile(const char *fname, enum e_settings flags,
               int argc, char **argv, char* env);
- 
+void load_fromconfname(const char *fn);
+void load_fromconf(int fd);
+
+#define elf_loadfile_a(fname, settings, p) (\
+    elf_loadfile(\
+      fname,\
+      settings,\
+      p.argc,\
+      params.argv,\
+      params.envp)\
+    )
+
 
 #endif
 

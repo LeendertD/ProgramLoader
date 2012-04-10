@@ -17,6 +17,8 @@ struct loader_api_s {
 
   void (*print_string)(const char*, int);
   void (*print_int)(int, int);
+  void (*load_fromconf)(const char* fname);
+  void (*load_fromconf_fd)(int fd);
 };
 
 

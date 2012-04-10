@@ -22,4 +22,8 @@ enum e_perms {
 void* reserve_range(void *start, size_t size, enum e_perms);
 //void patcher_zero(char *start, size_t size);
 //void patcher_patch(char *start, size_t count, char *src, size_t len);
+//
+
+int streq(const char *a, const char *b);
+
 #endif

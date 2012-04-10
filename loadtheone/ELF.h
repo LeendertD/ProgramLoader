@@ -94,7 +94,7 @@ static inline uint64_t betohll(uint64_t x) {
 
 
 /*Leendert: Edited for moving into stand alone loader*/
-#include "types.h"
+//#include "types.h"
 
 // Some ELF types
 typedef uint32_t Elf32_Addr;

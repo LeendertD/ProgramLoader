@@ -15,6 +15,7 @@
 #include "loader.h"
 #include <unistd.h>
 
+#define NODE_BASELOCK 3
 
 int stupidcounter = 1;
 Elf_Addr base_off = 0x0010000000000000;
@@ -28,7 +29,7 @@ sl_enddef
 
 Elf_Addr locked_newbase(void){
   Elf_Addr val;
-  sl_create(, MAKE_CLUSTER_ADDR(3, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(Elf_Addr*, basep, &val));
+  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(Elf_Addr*, basep, &val));
   sl_sync();
 
   return val;
@@ -121,12 +122,13 @@ int elf_loadfile(const char *fname, enum e_settings flags,
   */
   //Load
   
-  if ((argc > 0) &&
-      !(flags & e_noprogname)
-     ){
-    argv[0] = (char*)fname;
-  }
-  //
+  //if ((argc > 0) &&
+  //    !(flags & e_noprogname)
+  //   ){
+  //  locked_print_string("Replacing argv0\n",2);
+  //  argv[0] = (char*)fname;
+  //}
+  //Disabled for sanity purposed, mine
 
   if (elf_loadprogram(fdata, fsize, verbose,
         flags,
@@ -487,23 +489,25 @@ Elf_Addr argsize(int argc, char** argv,char * envp){
 int argsave(Elf_Addr start,struct admin_s *ab,int argc, char** argv,char * envp){
   int i=0;
   char **acpp = (char **)start;
-  char *cpnt = (char*) (start + (sizeof(char*) *argc + 1));
+  char *cpnt = (char*) (start + (sizeof(char*) *(argc + 1)));
   ab->argc = argc;
   ab->argv = acpp;
   //Argv
   for (i=0;i<argc;i++){
-    int k = 0;
+    int k;
     acpp[i] = cpnt;//Argv
     acpp[i+1] = NULL;
     *cpnt = 0;
 
     //Now copy the string
-    while (argv && argv[k]){
+    k = 0;
+    while (argv && argv[i] && (argv[i])[k]){
       *cpnt = (argv[i])[k];
       cpnt++;
       *cpnt = 0;
       k++;
     }
+    cpnt++;//Room for nullbyte at arg end
   }
   cpnt++;
 

@@ -210,10 +210,12 @@ void locked_print_int(int val, int fp){
   sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintint_fn, sl_glarg(int, strp, val), sl_glarg(int , fd, fp) );
   sl_sync();
 }
-struct loader_api_s loader_api = {
-  &elf_loadfile,
-  &locked_print_string,
-  &locked_print_int
-};
+
+int streq(const char *a, const char *b){
+  /* No dependency needed for simple comparison */
+  int i=0;
+  while (((a[i]) == (b[i])) && a[i]) i++;
+  return (a[i]) == (b[i]);
+}
 
 
