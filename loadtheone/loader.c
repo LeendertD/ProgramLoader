@@ -220,7 +220,7 @@ int read_argv(int fd, struct admin_s *out){
   return 0;
 }
 
-void load_fromconf(int fd){
+void elf_fromconf(int fd){
   struct admin_s params;
   params.fname = NULL;
   params.argc = 0;
@@ -242,12 +242,12 @@ void load_fromconf(int fd){
   }
 
   int i = 0;
-  for (i=0;i < params.argc;i++) {
+  /*for (i=0;i < params.argc;i++) {
     locked_print_string(":", 1);
     locked_print_string(params.argv[i], 1);
     locked_print_string(";\n", 1);
-  }
-  elf_loadfile_a(params.fname, settings, params);
+  }*/
+  elf_loadfile_p(&params, settings);
 
   for (i=0;i < params.argc;i++) {
     free(params.argv[i]);
@@ -255,9 +255,9 @@ void load_fromconf(int fd){
   free(params.argv);
   free(params.envp);
 }
-void load_fromconfname(const char *fn){
+void elf_fromconfname(const char *fn){
   int fd = open(fn, O_RDONLY);
-  load_fromconf(fd);
+  elf_fromconf(fd);
   close(fd);
 }
  
@@ -265,6 +265,6 @@ struct loader_api_s loader_api = {
   &elf_loadfile,
   &locked_print_string,
   &locked_print_int,
-  &load_fromconfname,
-  &load_fromconf
+  &elf_fromconfname,
+  &elf_fromconf
 };

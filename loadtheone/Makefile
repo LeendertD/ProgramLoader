@@ -1,3 +1,7 @@
+#
+# Leendert van Duijn:
+# Handwritten Makefile, does its job, no more no less.
+#
 
 SLC=slc 
 SLR=slr

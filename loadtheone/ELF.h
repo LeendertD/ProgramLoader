@@ -1,6 +1,15 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+/***
+ *  Leendert van Duijn:
+ *  Copied this file from the microgrid framework, moddified for C (no ++)
+ *  usage. Some functions are needed, others could be removed. Most importantly
+ *  is the usage as a local header, nothing should be exported from this.
+ *
+ ***/
+
+
 /*Leendert: Removed as this is just included for some types.
 // Include the configuration defines
 #include "sys_config.h"

@@ -4,6 +4,7 @@
  *
  *  Functions used in support of loading programs.
  *
+ * Basic or low level functions.
  *
  **/
 
@@ -28,6 +29,8 @@
 
 #define PRINTCORE 2
 
+
+//This is equal to 1 << bits ....?
 size_t bytes_from_bits(size_t bits){
   size_t bs = 1;
   while (bits--) bs = bs << 1;
@@ -40,6 +43,10 @@ static const size_t minpagebytes = (size_t)1 << minpagebits;
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
 
 int reserve_single(void *addr, size_t sz_bits){
+  /**
+   * Reserve a single page.
+   * Returns an indication of success.
+   * */
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
     mgsim_control(addr, MGSCTL_TYPE_MEM, MGSCTL_MEM_MAP, sz_bits - minpagebits);
     return 0;
@@ -48,8 +55,12 @@ int reserve_single(void *addr, size_t sz_bits){
 }
 
 void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
+  /**
+   * Reserve a range of bytes, try to obtain at least perm permissions.
+   * Returns a pointer to the actual end of the range.
+   * Which MIGHT be beyond the expeceted end, due to page size limitations.
+   * */
   size_t pages;
-  //void* startaddr = addr;
   
   size_t sz_bits = 1;
   size_t i;
@@ -65,6 +76,7 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
   }
 
   if ((bytes >= minpagebytes ) && (bytes <= maxpagebytes)){
+    //If a single page is ok, use it.
     if (reserve_single(addr, sz_bits)) return 0;
     return addr + (1 << sz_bits);
   }
@@ -93,7 +105,7 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
   return addr + resc;
 }
 
-/*
+/* These functions are abandoned for now....
 void patcher_zero(char *start, size_t size){
   memset(start, 0, size);
 }
@@ -112,6 +124,8 @@ int fakemain(int arg, char **argv, char *anv){
   return 42;
 }
 */
+
+
 /* This is the skeleton which boots a new program */
 sl_def(thread_function,,
                sl_glparm(main_function_t* , f),
@@ -119,6 +133,7 @@ sl_def(thread_function,,
                sl_glparm(char**,  av),
                sl_glparm(char*, e)
     ){
+  /* Boot a program, do SOME administration */
   main_function_t *f = sl_getp(f);
   int ac = sl_getp(ac);
   char **av = sl_getp(av);
@@ -141,7 +156,7 @@ sl_def(thread_function,,
 sl_enddef
 
 int function_spawn(main_function_t * main_f,
-                    int argc, char **argv, char *envp ){
+                    struct admin_s *params){
   // Placeholder for function argument determination
   //char *argv[] = {strdup("a.out"), strdup("HOI"), 0};
   //int argc = 2;
@@ -170,13 +185,28 @@ int function_spawn(main_function_t * main_f,
 
   /*Create, run PROFIT*/
   // optie 3 (asynchroon, nooit gesynchroniseerd)
-  sl_create( , , , , , , , thread_function, 
-    sl_glarg(main_function_t* ,, main_f),
-    sl_glarg(int, , argc),
-    sl_glarg(char**, , argv),
-    sl_glarg(char*, , envp)
-  );
-  sl_detach();
+  
+  fprintf(stdout, "To cores: %d @ %d\n",params->core_size, params->core_start);
+  
+  if (params->core_start == -1){
+    sl_create( , , , , , , , thread_function, 
+      sl_glarg(main_function_t* ,, main_f),
+      sl_glarg(int, , params->argc),
+      sl_glarg(char**, , params->argv),
+      sl_glarg(char*, , params->envp)
+    );
+    sl_detach();
+  } else {
+    int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
+    //What type exactly?
+    sl_create( ,cad, , , , , , thread_function, 
+      sl_glarg(main_function_t* ,, main_f),
+      sl_glarg(int, , params->argc),
+      sl_glarg(char**, , params->argv),
+      sl_glarg(char*, , params->envp)
+    );
+    sl_detach();
+  }
 
   return 0;
 }

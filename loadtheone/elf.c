@@ -20,19 +20,18 @@
 int stupidcounter = 1;
 Elf_Addr base_off = 0x0010000000000000;
 
-sl_def(slbase_fn,, sl_glparm(Elf_Addr*, basep)){
-  Elf_Addr *val = sl_getp(basep);
-  *val = stupidcounter * base_off;
+sl_def(slbase_fn,, sl_glparm(struct admin_s*, basep)){
+  struct admin_s *val = sl_getp(basep);
+  val->base = stupidcounter * base_off;
   stupidcounter++;
 }
 sl_enddef
 
-Elf_Addr locked_newbase(void){
-  Elf_Addr val;
-  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(Elf_Addr*, basep, &val));
+Elf_Addr locked_newbase(struct admin_s *params){
+  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(struct admin_s*, params, params));
   sl_sync();
 
-  return val;
+  return params->base;
 }
 
 void locked_delbase(Elf_Addr adr){
@@ -41,8 +40,8 @@ void locked_delbase(Elf_Addr adr){
 }
 
 #define SANE_SIZE sizeof(struct Elf_Ehdr)
-int elf_loadfile(const char *fname, enum e_settings flags,
-              int argc, char **argv, char* env){
+
+int elf_loadfile_p(struct admin_s * params, enum e_settings flags){
   int fin = -1;
   size_t fsize = 0;
   struct stat fstatus;
@@ -54,10 +53,10 @@ int elf_loadfile(const char *fname, enum e_settings flags,
   char buff[1024];
 
   if (verbose) {
-    snprintf(buff, 1023,"Loading %s\n", fname);
+    snprintf(buff, 1023,"Loading %s\n", params->fname);
     locked_print_string(buff, PRINTERR);
   }
-  fin = open(fname, O_RDONLY);
+  fin = open(params->fname, O_RDONLY);
 
   if (-1 == fin){
     const char *err = strerror(errno);
@@ -67,7 +66,7 @@ int elf_loadfile(const char *fname, enum e_settings flags,
   }
   if (fstat(fin, &fstatus)) {
     const char *err = strerror(errno);
-    snprintf(buff, 1023, "File not statted %s: %s\n", fname, err);
+    snprintf(buff, 1023, "File not statted %s: %s\n", params->fname, err);
     locked_print_string(buff, PRINTERR);
     return 0;
   }
@@ -130,14 +129,30 @@ int elf_loadfile(const char *fname, enum e_settings flags,
   //}
   //Disabled for sanity purposed, mine
 
-  if (elf_loadprogram(fdata, fsize, verbose,
+  if (elf_loadprogram_p(fdata, fsize, verbose,
         flags,
-        argc,argv,env
+        params
         )){
     locked_print_string("Elf failure\n", PRINTERR);
   }
     
   return 0;
+}
+
+int elf_loadfile(const char *fname, enum e_settings flags,
+              int argc, char **argv, char* env){
+
+  struct admin_s params;
+  params.fname = strdup(fname);
+  params.base = 0;
+  params.core_start = -1;
+  params.core_size = -1;
+
+  params.argc = argc;
+  params.argv = argv;
+  params.envp = env;
+
+  return elf_loadfile_p(&params, flags);
 }
 
 
@@ -321,6 +336,9 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
           locked_print_string(buff, PRINTERR);
         }
       } else {
+        /* If the name equals a 'magic' name, remember the address for usage for
+         * things like argv, env. Or anything yet to be invented.
+         **/
         act_addr = ((char*)base) + phdr[i].p_vaddr;
 
         if (verbose) {
@@ -446,8 +464,7 @@ int elf_runpatches(char *mstart, size_t size, int verbose,
 
 
 int elf_spawn(char *dstart, size_t size, struct admin_s *adminstart,
-              int verbose, enum e_settings flags,
-              int argc, char **argv, char *envp){
+              int verbose, enum e_settings flags){
   Elf_Addr base = adminstart->base;
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   if (verbose) {
@@ -457,8 +474,7 @@ int elf_spawn(char *dstart, size_t size, struct admin_s *adminstart,
   }
   //fprintf(stdout,"%d:%p: %s@%p\n",argc,(void*)argv, argv[0],(void*)argv[0]);
   function_spawn((main_function_t*) ((char*)base + ehdr->e_entry),
-      argc, argv, envp
-      );
+      adminstart);
   return 0;
 }
 
@@ -528,11 +544,27 @@ int elf_loadprogram(char* data, size_t size, int verbose,
                     enum e_settings flags,
                     int argc, char **argv, char *envp
                     ){
-  Elf_Addr base = locked_newbase();
+  struct admin_s params;
+  params.fname = NULL;
+  params.base = 0;
+  params.core_start = -1;
+  params.core_size = -1;
+
+  params.argc = argc;
+  params.argv = argv;
+  params.envp = envp;
+
+  return elf_loadprogram_p(data, size, verbose, flags, &params);
+}
+int elf_loadprogram_p(char *data, size_t size, int verbose,
+    enum e_settings flags, struct admin_s * params){
+  Elf_Addr base = locked_newbase(params);
   Elf_Addr relbase;
   struct admin_s *adminstart;
+  struct admin_s *p = params;//Shorter...
 
-  Elf_Addr adminsize = sizeof(struct admin_s) + argsize(argc, argv, envp);
+  Elf_Addr adminsize = sizeof(struct admin_s) +
+                       argsize(p->argc, p->argv, p->envp);
   
   if (elf_header_marshall(data,size)){
     locked_print_string("Marshalling failed\n", PRINTERR);
@@ -560,6 +592,12 @@ int elf_loadprogram(char* data, size_t size, int verbose,
   adminstart = (struct admin_s*)base;
   //Prepare storage for argv and env
   base = (Elf_Addr)reserve_range((void*)base, adminsize, perm_read|perm_write);
+  
+  //Copy all preset settings
+  *adminstart = *params;
+  adminstart->base = base;
+
+  
   base += relbase;//correct for elf base
   if (verbose) {
     char buff[1024];
@@ -570,9 +608,9 @@ int elf_loadprogram(char* data, size_t size, int verbose,
   adminstart->base = base;
   if (argsave(((Elf_Addr)adminstart) + sizeof(struct admin_s),
               adminstart,
-              argc,
-              argv,
-              envp)){
+              p->argc,
+              p->argv,
+              p->envp)){
     locked_print_string("Problem in argument construction\n", PRINTERR);
   }
 
@@ -587,8 +625,7 @@ int elf_loadprogram(char* data, size_t size, int verbose,
     return -1;
   }*/
   
-  if (elf_spawn(data, size, adminstart, verbose, flags,
-        adminstart->argc,adminstart->argv,adminstart->envp)){
+  if (elf_spawn(data, size, adminstart, verbose, flags)){
     locked_print_string("Elf spawning failed\n", PRINTERR);
     return -1;
   }

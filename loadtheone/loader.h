@@ -30,27 +30,25 @@ struct admin_s {
 };
 
 int function_spawn(main_function_t * main_f,
-                    int argc, char **argv, char *envp );
+                    struct admin_s *);
  
 
 int elf_loadprogram(char*, size_t, int verbose,
                     enum e_settings,
                     int argc, char **argv, char *env
     );
+int elf_loadprogram_p(char*, size_t, int verbose,
+                    enum e_settings,
+                    struct admin_s *
+    );
+
+
 int elf_loadfile(const char *fname, enum e_settings flags,
               int argc, char **argv, char* env);
-void load_fromconfname(const char *fn);
-void load_fromconf(int fd);
+void elf_fromconfname(const char *fn);
+void elf_fromconf(int fd);
 
-#define elf_loadfile_a(fname, settings, p) (\
-    elf_loadfile(\
-      fname,\
-      settings,\
-      p.argc,\
-      params.argv,\
-      params.envp)\
-    )
-
+int elf_loadfile_p(struct admin_s *, enum e_settings);
 
 #endif
 
