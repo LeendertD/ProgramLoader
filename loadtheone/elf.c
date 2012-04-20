@@ -17,26 +17,59 @@
 
 #define NODE_BASELOCK 3
 
-int stupidcounter = 1;
-Elf_Addr base_off = 0x0010000000000000;
+#define MAXPROCS 1024
 
-sl_def(slbase_fn,, sl_glparm(struct admin_s*, basep)){
-  struct admin_s *val = sl_getp(basep);
-  val->base = stupidcounter * base_off;
-  stupidcounter++;
+struct admin_s proctable[MAXPROCS];
+int nextfreepid = 1;
+
+void init_admins(void){
+  int i;
+  for (i=0;i<MAXPROCS;i++){
+    proctable[i].base = 0;
+    proctable[i].pidnum = 0;
+    proctable[i].argc = 0;
+    proctable[i].argv = NULL;
+    proctable[i].envp = NULL;
+
+    proctable[i].nextfreepid = i+1;
+  }
+  proctable[MAXPROCS-1].nextfreepid = 0;
+}
+
+sl_def(slbase_fn,, sl_glparm(struct admin_s**, basep)){
+  int npid = nextfreepid;
+  struct admin_s **val = sl_getp(basep);
+  *val = &proctable[npid];
+  (*val)->base = npid * base_off;
+  (*val)->pidnum = npid;
+  
+  nextfreepid = (*val)->nextfreepid;
+  (*val)->nextfreepid = 0;;
 }
 sl_enddef
 
-Elf_Addr locked_newbase(struct admin_s *params){
-  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(struct admin_s*, params, params));
+sl_def(sldelbase_fn,, sl_glparm(int, deadpid)){
+  int npid = nextfreepid;
+  int deadpid = sl_getp(deadpid);
+  struct admin_s *val = &proctable[deadpid];
+  val->pidnum = 0;
+  
+  val->nextfreepid = npid;
+  nextfreepid = deadpid;
+}
+sl_enddef
+
+
+Elf_Addr locked_newbase(struct admin_s **params){
+  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(struct admin_s**, params, params));
   sl_sync();
 
-  return params->base;
+  return (*params)->base;
 }
 
-void locked_delbase(Elf_Addr adr){
-  ////
-  (void)adr;
+void locked_delbase(int deadpid){
+  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
+  sl_sync();
 }
 
 #define SANE_SIZE sizeof(struct Elf_Ehdr)
@@ -300,6 +333,7 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
       if (phdr[i].p_flags & PF_X) perm |= perm_exec;
       //IMemory::PERM_EXECUTE;
             
+      act_addr = ((char*)base) + phdr[i].p_vaddr;
       if (phdr[i].p_filesz > 0){
         //Segment containing payload
         Verify(phdr[i].p_offset + phdr[i].p_filesz <= size,
@@ -313,7 +347,6 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
         ranges.push_back(r);
         */
 
-        act_addr = ((char*)base) + phdr[i].p_vaddr;
 
         if (verbose) {
           char buff[1024];
@@ -339,8 +372,6 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
         /* If the name equals a 'magic' name, remember the address for usage for
          * things like argv, env. Or anything yet to be invented.
          **/
-        act_addr = ((char*)base) + phdr[i].p_vaddr;
-
         if (verbose) {
           snprintf(buff, 1023, "load U: %d: 0X%x size %p,%p @ %p\n with %d", phdr[i].p_type, i,
           (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
@@ -556,15 +587,14 @@ int elf_loadprogram(char* data, size_t size, int verbose,
 
   return elf_loadprogram_p(data, size, verbose, flags, &params);
 }
+
 int elf_loadprogram_p(char *data, size_t size, int verbose,
     enum e_settings flags, struct admin_s * params){
-  Elf_Addr base = locked_newbase(params);
   Elf_Addr relbase;
-  struct admin_s *adminstart;
-  struct admin_s *p = params;//Shorter...
+  struct admin_s *p = NULL;
+  locked_newbase(&p);
 
-  Elf_Addr adminsize = sizeof(struct admin_s) +
-                       argsize(p->argc, p->argv, p->envp);
+  //Elf_Addr theargsize = argsize(p->argc, p->argv, p->envp);
   
   if (elf_header_marshall(data,size)){
     locked_print_string("Marshalling failed\n", PRINTERR);
@@ -575,6 +605,7 @@ int elf_loadprogram_p(char *data, size_t size, int verbose,
     return -1;
   }
   if (elf_header_check_arch(data,size)){
+    //IN A MAGIC ELF SECTION TODOta,size)){
     locked_print_string("Architecture check failed\n", PRINTERR);
     return -1;
   }
@@ -582,39 +613,45 @@ int elf_loadprogram_p(char *data, size_t size, int verbose,
   relbase = elf_findbase_marshallphdr(data, size);
   if (verbose) {
     char buff[1024];
-    snprintf(buff, 1023, "base_file: %p\n", (void*)base);
+    snprintf(buff, 1023, "base_file: %p\n", (void*)relbase);
     locked_print_string(buff, PRINTERR);
   }
-  //Is this Allignment? won't it damage something?
-  static const int PAGE_SIZE = 4096;
-  relbase = relbase & -PAGE_SIZE;
 
-  adminstart = (struct admin_s*)base;
   //Prepare storage for argv and env
-  base = (Elf_Addr)reserve_range((void*)base, adminsize, perm_read|perm_write);
+  //IN A MAGIC ELF SECTION TODO
+  //base = (Elf_Addr)reserve_range((void*)p->base, adminsize, perm_read|perm_write);
   
-  //Copy all preset settings
-  *adminstart = *params;
-  adminstart->base = base;
 
+  p->fname = params->fname;
+  p->core_start = params->core_start;
+  p->core_size = params->core_size;
+
+  //magic loading, until then:
+  p->argc = 0;
+  p->argv = NULL;
+  p->envp = NULL;
   
-  base += relbase;//correct for elf base
+  //p->base += relbase;//correct for elf base
+  //force Allignment
+  static const int PAGE_SIZE = 4096;
+  p->base = p->base & -PAGE_SIZE;
+  
   if (verbose) {
     char buff[1024];
-    snprintf(buff, 1023, "base_used: %p\n", (void*)base);
+    snprintf(buff, 1023, "base_used: %p\n", (void*)p->base);
     locked_print_string(buff, PRINTERR);
   }
 
-  adminstart->base = base;
+  /*
   if (argsave(((Elf_Addr)adminstart) + sizeof(struct admin_s),
               adminstart,
               p->argc,
               p->argv,
               p->envp)){
     locked_print_string("Problem in argument construction\n", PRINTERR);
-  }
+  }*/
 
-  if (elf_loadit(data, size, adminstart, verbose)){
+  if (elf_loadit(data, size, p, verbose)){
     locked_print_string("Elf loading failed\n", PRINTERR);
     return -1;
   }
@@ -625,11 +662,10 @@ int elf_loadprogram_p(char *data, size_t size, int verbose,
     return -1;
   }*/
   
-  if (elf_spawn(data, size, adminstart, verbose, flags)){
+  if (elf_spawn(data, size, p, verbose, flags)){
     locked_print_string("Elf spawning failed\n", PRINTERR);
     return -1;
   }
-
 
   return  0;
 }

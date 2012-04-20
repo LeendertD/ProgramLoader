@@ -7,31 +7,18 @@
     fprintf(stderr, "Verification failure: %s\n", (Message) ); \
     svp_abort();                                                   \
   }
-
+#include "ELF.h"
 #include "loader_api.h"
 //
 typedef int (main_function_t)(int argc, char **argv, char *envp, void* spwn);
 
-
-#define PRINTERR 2
-#define PRINTOUT 1
-
 void locked_print_int(int val, int fp);
 void locked_print_string(const char*, int fp);
 
-struct admin_s {
-  Elf_Addr base;
-  char *fname;
-  int core_start;
-  int core_size;
-  int argc;
-  char **argv;
-  char *envp;
-};
+void init_admins(void);
 
 int function_spawn(main_function_t * main_f,
                     struct admin_s *);
- 
 
 int elf_loadprogram(char*, size_t, int verbose,
                     enum e_settings,
@@ -50,5 +37,7 @@ void elf_fromconf(int fd);
 
 int elf_loadfile_p(struct admin_s *, enum e_settings);
 
+void locked_delbase(int deadpid);
+Elf_Addr locked_newbase(struct admin_s **params);
 #endif
 

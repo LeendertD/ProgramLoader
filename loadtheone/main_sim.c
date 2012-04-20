@@ -15,6 +15,8 @@
 int main(int argc, char **argv){
   int i;
 
+  init_admins();
+
   /*
   int ff = open("programs.cfg", O_RDONLY);
   if (ff != -1){

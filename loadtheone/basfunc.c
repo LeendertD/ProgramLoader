@@ -129,15 +129,14 @@ int fakemain(int arg, char **argv, char *anv){
 /* This is the skeleton which boots a new program */
 sl_def(thread_function,,
                sl_glparm(main_function_t* , f),
-               sl_glparm(int, ac),
-               sl_glparm(char**,  av),
-               sl_glparm(char*, e)
+               sl_glparm(struct admin_s *, params)
     ){
   /* Boot a program, do SOME administration */
   main_function_t *f = sl_getp(f);
-  int ac = sl_getp(ac);
-  char **av = sl_getp(av);
-  char *e = sl_getp(e);
+  struct admin_s *params = sl_getp(params);
+  int ac = params->argc;
+  char **av = params->argv;
+  char *e = params->envp;
   struct loader_api_s *p = &loader_api;
   
   char buff[1024];
@@ -152,6 +151,8 @@ sl_def(thread_function,,
 
   snprintf(buff, 1023, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
   locked_print_string(buff, PRINTERR);
+
+  locked_delbase(params->pidnum);
 }
 sl_enddef
 
@@ -191,19 +192,15 @@ int function_spawn(main_function_t * main_f,
   if (params->core_start == -1){
     sl_create( , , , , , , , thread_function, 
       sl_glarg(main_function_t* ,, main_f),
-      sl_glarg(int, , params->argc),
-      sl_glarg(char**, , params->argv),
-      sl_glarg(char*, , params->envp)
+      sl_glarg(struct admin_s*, , params)
     );
     sl_detach();
   } else {
     int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
-    //What type exactly?
+
     sl_create( ,cad, , , , , , thread_function, 
       sl_glarg(main_function_t* ,, main_f),
-      sl_glarg(int, , params->argc),
-      sl_glarg(char**, , params->argv),
-      sl_glarg(char*, , params->envp)
+      sl_glarg(struct admin_s*, , params)
     );
     sl_detach();
   }

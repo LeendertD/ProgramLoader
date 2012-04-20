@@ -1,6 +1,8 @@
 
 #include "../loadtheone/loader_api.h"
 
+char BUFFY[4096] = {0};
+
 int test(int argc, char **argv, char*env, struct loader_api_s *api){
   //int (*s)(const char*,enum e_settings, int,char**,char*);
   void (*output_string)(const char *, int) = api->print_string;

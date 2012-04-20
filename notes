@@ -1,1 +1,21 @@
 install valgrind
+
+
+Why is there no lseek?
+
+
+Edited for X bit
+/root/sl-installer-3.6/sources/mgsim-3.2.35-c4804/arch/proc/Processor.cpp
+
+
+mgsim/arch/dev/... memory.h --> read == exec
+
+sbrk, somewhere prototype removed due to clash
+
+new thread:
+function pointer
+-stack 
+-heap
+
+Macro for admin block, some 16 MB fixed size
+

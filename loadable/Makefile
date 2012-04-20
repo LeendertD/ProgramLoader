@@ -1,6 +1,7 @@
 all: tinyex spawny printy fourtwo
 
 CRT=crt_simple.s
+#argroom.s
 CC=slc -nostdlib 
 
 CFLAGS=`../gcflags`

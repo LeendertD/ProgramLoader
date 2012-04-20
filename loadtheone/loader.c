@@ -266,5 +266,6 @@ struct loader_api_s loader_api = {
   &locked_print_string,
   &locked_print_int,
   &elf_fromconfname,
-  &elf_fromconf
+  &elf_fromconf,
+  &elf_loadfile_p
 };
