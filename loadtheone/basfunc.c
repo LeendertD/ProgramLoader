@@ -32,9 +32,7 @@
 
 //This is equal to 1 << bits ....?
 size_t bytes_from_bits(size_t bits){
-  size_t bs = 1;
-  while (bits--) bs = bs << 1;
-  return bs;
+  return 1l << bits;
 }
 
 #define minpagebits ((size_t)  12)
@@ -105,27 +103,6 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
   return addr + resc;
 }
 
-/* These functions are abandoned for now....
-void patcher_zero(char *start, size_t size){
-  memset(start, 0, size);
-}
-void patcher_patch(char *start, size_t count, char *src, size_t len){
-  while (count >0){
-    fprintf(stderr, "PATCH %p,from %p, size %p\n",
-        (void*)start,(void*)src,(void*)len);
-    memcpy(start, src, len);
-    start += len;
-    count--;
-  }
-}
-
-int fakemain(int arg, char **argv, char *anv){
-  fprintf(stderr, "FAKEMAIN\n");
-  return 42;
-}
-*/
-
-
 /* This is the skeleton which boots a new program */
 sl_def(thread_function,,
                sl_glparm(main_function_t* , f),
@@ -187,15 +164,20 @@ int function_spawn(main_function_t * main_f,
   /*Create, run PROFIT*/
   // optie 3 (asynchroon, nooit gesynchroniseerd)
   
-  fprintf(stdout, "To cores: %d @ %d\n",params->core_size, params->core_start);
-  
+  char buff[1024];
+  buff[0] = 0;
+  snprintf(buff, 1023,
+      "To cores: %d @ %d\n",params->core_size, params->core_start);
+  locked_print_string(buff, PRINTERR);
   if (params->core_start == -1){
+    //Autocore, or actually just 'here'
     sl_create( , , , , , , , thread_function, 
       sl_glarg(main_function_t* ,, main_f),
       sl_glarg(struct admin_s*, , params)
     );
     sl_detach();
   } else {
+    //There are core placement specs
     int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
 
     sl_create( ,cad, , , , , , thread_function, 
@@ -225,6 +207,16 @@ void locked_print_string(const char *stin, int fp){
   sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintstr_fn, sl_glarg(const char *, strp, stin), sl_glarg(int , fd, fp) );
   sl_sync();
 }
+
+void locked_print_pointer(void* pl, int fp){
+  char buff[128];
+  buff[0] = 0;
+  snprintf(buff,127, "%016lx", (unsigned long) pl);
+  sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintstr_fn, sl_glarg(const char *, strp, buff), sl_glarg(int , fd, fp) );
+  sl_sync();
+}
+
+
 
 sl_def(slprintint_fn,, sl_glparm(int, strp), sl_glparm(int, fd)){
   int val = sl_getp(strp);

@@ -329,7 +329,80 @@ struct Elf_Phdr
 	Elf_Xword p_align;
 };
 #endif
-#pragma pack()
 
+#pragma pack()
+typedef Elf_Addr Elf_Size;
+
+/**Leendert: Introducing section headers, ELF */
+struct Elf_Shdr
+{
+  Elf64_Word sh_name;
+  Elf64_Word sh_type;
+  Elf64_Addr  sh_flags;
+  Elf64_Addr sh_addr;
+  Elf64_Addr  sh_offset;
+  Elf64_Addr sh_size;
+  Elf64_Word sh_link;
+  Elf64_Word sh_info;
+  Elf64_Addr sh_addralign;
+  Elf64_Addr sh_entsize;
+};
+
+/**Leendert: Introducing Relocation*/
+struct Elf_Rel {
+  Elf_Addr r_offset;
+  Elf_Word r_info;
+};
+
+struct Elf_Rela {
+  Elf_Addr r_offset;
+  Elf_Addr r_info;
+  Elf_Sword r_addend;
+};
+
+//As defined on page 1-22 Book 1 ELF
+//BSD CORRECTIONS
+#define ELF_REL_SYM(i) ((i) >> 32)
+#define ELF_REL_TYPE(i) ((unsigned char)(i))
+#define ELF_REL_INFO(s, t) (((s) << 32) + (unsigned char) (t))
+
+struct Elf_Sym {
+  Elf_Word st_name;
+  unsigned char st_info;
+  unsigned char st_other;
+  Elf_Half st_shndx;
+  Elf_Addr st_value;
+  Elf_Size st_size;
+};
+
+#define ELF_SYM_BIND(i) ((i)>>4)
+#define ELF_SYM_TYPE(i) ((i) & 0xf)
+#define ELF_SYM_INFO(i,t) ((i) << 4 + ((t)&0xf))
+
+#define SECTION_NULL 0
+#define SECTION_PROGBITS 1
+#define SECTION_SYMTAB 2
+#define SECTION_STRTAB 3
+#define SECTION_RELA 4
+#define SECTION_HASH 5
+#define SECTION_DYN 6
+#define SECTION_NOTE 7
+#define SECTION_NOBITS 8
+#define SECTION_REL 9
+#define SECTION_SHLIB 10
+#define SECTION_DYNSYM 11
+#define SECTION_LOPROC 0x70000000
+#define SECTION_HIPROC 0x7fffffff
+#define SECTION_LOUSER 0x80000000
+#define SECTION_HIUSER 0xffffffff
+
+
+#define ELF_RR_RELATIVE 27
+#define ELF_RR_GLOBDAT 25
+#define ELF_RR_JMPSLOT 26
+
+
+const char * elf_symname(Elf_Addr base,struct Elf_Shdr *, struct Elf_Sym* sym, struct Elf_Ehdr *ehdr);
+const char *elf_sectname(Elf_Addr base, int num,struct Elf_Ehdr *ehdr);
 #endif
 

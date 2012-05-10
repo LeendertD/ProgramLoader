@@ -1,23 +1,23 @@
 all: tinyex spawny printy fourtwo
 
-CRT=crt_simple.s
+CRT=crt_simple.s argroom.s
 #argroom.s
-CC=slc -nostdlib 
+CC=slc -nostdlib -fPIC -fpic -Wl,-shared
 
 CFLAGS=`../gcflags`
-
+MK=./makeone.sh
 clean:
 	rm -f tinyex spawny printy fourtwo
 NA=tinyex
 $(NA): $(NA).c $(CRT)
-	$(CC) $(CFLAGS) -b mta $(NA).c $(CRT) -o $(NA)
+	$(MK) $@
 
 NB=spawny
 $(NB): $(NB).c $(CRT)
-	$(CC) $(CFLAGS) -b mta $(NB).c $(CRT) -o $(NB)
+	$(MK) $@
 NC=printy
 $(NC): $(NC).c $(CRT)
-	$(CC) $(CFLAGS) -b mta $(NC).c $(CRT) -o $(NC)
+	$(MK) $@
 ND=fourtwo
 $(ND): $(ND).c $(CRT)
-	$(CC) $(CFLAGS) -b mta $(ND).c $(CRT) -o $(ND)
+	$(MK) $@

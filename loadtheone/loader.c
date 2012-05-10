@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 
-/*Call abort, we need a prototype*/
 #include <svp/mgsim.h>
 #include <stddef.h>
 #include <svp/abort.h>
@@ -131,7 +130,6 @@ int read_env(int fd, struct admin_s *out){
     out->envp[i] = b;
     out->envp[i+1] = 0;
     out->envp[i+2] = 0;
-    fprintf(stderr, "%s :> %d\n", out->envp + w, i);
     if (esc){
       esc = 0;
       continue;
@@ -181,7 +179,6 @@ int read_argv(int fd, struct admin_s *out){
     if (! read(fd, &b, 1)) break;
     buff[i] = b;
     buff[i+1] = 0;
-    fprintf(stderr, "%s > %d\n", buff, i);
     if (esc){
       esc = 0;
       continue;
@@ -260,12 +257,22 @@ void elf_fromconfname(const char *fn){
   elf_fromconf(fd);
   close(fd);
 }
+
+enum handled_by elf_clientbreakpoint(int id, const char *msg){
+  locked_print_string(msg, PRINTERR);
+  locked_print_int(id, PRINTERR);
+  //....
+  return HANDLED_USER;
+}
  
 struct loader_api_s loader_api = {
   &elf_loadfile,
   &locked_print_string,
   &locked_print_int,
+  &locked_print_pointer,
   &elf_fromconfname,
   &elf_fromconf,
-  &elf_loadfile_p
+  &elf_loadfile_p,
+  &elf_clientbreakpoint
 };
+

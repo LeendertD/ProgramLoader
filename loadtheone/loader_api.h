@@ -23,9 +23,17 @@ struct admin_s {
   char **argv;
   char *envp;
 
+  long argroom_offset;
+  long argroom_size;
+
   int nextfreepid;
 };
 
+enum handled_by {
+  HANDLED_NO = 0,
+  HANDLED_USER,
+  HANDLED_CONFIG 
+};
 
 
 struct loader_api_s {
@@ -36,9 +44,11 @@ struct loader_api_s {
 
   void (*print_string)(const char*, int);
   void (*print_int)(int, int);
+  void (*print_pointer)(void*, int);
   void (*load_fromconf)(const char* fname);
   void (*load_fromconf_fd)(int fd);
   int (*load_fromparam)(struct admin_s *, enum e_settings);
+  enum handled_by (*breakpoint)(int id, const char *msg);
  
 };
 

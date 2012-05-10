@@ -19,3 +19,8 @@ function pointer
 
 Macro for admin block, some 16 MB fixed size
 
+............................
+relocation might be doing something wrong, it is trying to locate a var (bp) and
+fails quite miserably.
+
+

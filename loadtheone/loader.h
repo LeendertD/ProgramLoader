@@ -14,7 +14,7 @@ typedef int (main_function_t)(int argc, char **argv, char *envp, void* spwn);
 
 void locked_print_int(int val, int fp);
 void locked_print_string(const char*, int fp);
-
+void locked_print_pointer(void* pl, int fp);
 void init_admins(void);
 
 int function_spawn(main_function_t * main_f,
