@@ -1,7 +1,7 @@
 
 #include "../loadtheone/loader_api.h"
 
-int test(int argc, char **argv, char *env, struct loader_api_s *api){
+int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   void (*output_string)(const char *, int) = api->print_string;
   void (*output_int)(int, int) = api->print_int;
   (void)api;

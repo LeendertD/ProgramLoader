@@ -49,9 +49,9 @@ _start:
         fclr $lf9 # flush arg reg
         fclr $lf10 # flush arg reg
         
-        # call test(void)
-        ldq $l14,test($l17) !literal!2
-        jsr $l15,($l14),test !lituse_jsr!2
+        # call lmain(void)
+        ldq $l14,lmain($l17) !literal!2
+        jsr $l15,($l14),lmain !lituse_jsr!2
         swch
         ldgp $l17,0($l15)
 

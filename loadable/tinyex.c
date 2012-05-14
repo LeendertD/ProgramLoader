@@ -23,13 +23,13 @@ const char *strs[] = {
 
 const char * a = "123456";
 
-int test(int argc, char **argv, char *env, struct loader_api_s *api){
+int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   int (*s)(const char*,enum e_settings, int,char**,char*);
   void (*output_string)(const char *, int) = api->print_string;
   void (*output_int)(int, int) = api->print_int;
   void (*output_pointer)(void*, int) = api->print_pointer;
 
-  output_pointer(a, PRINTOUT);
+  output_pointer((char*)a, PRINTOUT);
 
   //Load the breakpoint function into a 'global' variable
   lbp = (void*)42;//api->breakpoint;
@@ -53,7 +53,7 @@ int test(int argc, char **argv, char *env, struct loader_api_s *api){
   for (i=0;strs[i];i++){
     output_int(i, PRINTOUT);
     output_string("#\n'", PRINTOUT);
-    output_pointer(strs[i], PRINTOUT);
+    output_pointer((void*)strs[i], PRINTOUT);
     output_string("\n'", PRINTOUT);
     output_string(strs[i], PRINTOUT);
     output_string("'...\n", PRINTOUT);

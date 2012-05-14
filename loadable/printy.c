@@ -5,7 +5,7 @@
 //#include <svp/testoutput.h>
 
 
-int test(int argc, char **argv, char*env, struct loader_api_s *api){
+int lmain(int argc, char **argv, char*env, struct loader_api_s *api){
   //int (*s)(const char*,enum e_settings, int,char**,char*);
   void (*output_string)(const char *, int) = api->print_string;
   void (*output_int)(int, int) = api->print_int;
@@ -45,13 +45,9 @@ int test(int argc, char **argv, char*env, struct loader_api_s *api){
   output_string("\n",1);
 
   endtime = clock();
-
   endtime -= starttime;
 
-  double result = endtime;
-  //result /= CLOCKS_PER_SEC;
-
   output_int(endtime, PRINTOUT);
- output_string("\n",1);
+  output_string("\n",1);
   return 0; 
 }
