@@ -24,3 +24,8 @@ relocation might be doing something wrong, it is trying to locate a var (bp) and
 fails quite miserably.
 
 
+slc -b mta tinyex.c crt_simple.s -o tinyex -nostdlib -fpic -fPIC -Wl,-shared
+mtalpha-linux-gnu-objdump -R ../loadable/tinyex|less -S
+
+
+/shell?

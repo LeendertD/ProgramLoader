@@ -39,5 +39,30 @@ int elf_loadfile_p(struct admin_s *, enum e_settings);
 
 void locked_delbase(int deadpid);
 Elf_Addr locked_newbase(struct admin_s **params);
+
+
+//These are macro based locked_print_strings, which check verbosity (verbose) needs to be
+//defined in the scope of usage
+#define VERB_ERR 0
+#define VERB_WARN 1
+#define VERB_INFO 2
+#define VERB_TRACE 3
+
+#define PRINTERROR(str) \
+  if (verbose > VERB_ERR) locked_print_string(str, PRINTERR);
+
+#define PRINTWARN(str) \
+  if (verbose > VERB_WARN) locked_print_string(str, PRINTERR);
+
+#define PRINTINFO(str) \
+  if (verbose > VERB_INFO) locked_print_string(str, PRINTERR);
+
+#define PRINTTRACE(str) \
+  if (verbose > VERB_TRACE) locked_print_string(str, PRINTERR);
+
+
+
+
+
 #endif
 

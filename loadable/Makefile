@@ -4,10 +4,15 @@ CRT=crt_simple.s argroom.s
 #argroom.s
 CC=slc -nostdlib -fPIC -fpic -Wl,-shared
 
+CLEANONE=./cleanone.sh
 CFLAGS=`../gcflags`
 MK=./makeone.sh
 clean:
-	rm -f tinyex spawny printy fourtwo
+	$(CLEANONE) tinyex
+	$(CLEANONE) spawny
+	$(CLEANONE) printy
+	$(CLEANONE) fourtwo
+
 NA=tinyex
 $(NA): $(NA).c $(CRT)
 	$(MK) $@

@@ -475,45 +475,24 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
         s->sh_type, s->sh_flags, s->sh_addr, s->sh_offset, s->sh_size, s->sh_link, s->sh_info, s->sh_addralign, s->sh_entsize);
     locked_print_string(buff, PRINTERR);
     switch (s->sh_type){
-//    case SECTION_STRTAB:{
-//      int r = 1;
-//      snprintf(buff,1023, "Stringtable %u, %lu@%p\n",s->sh_name, s->sh_size, (void*)s->sh_offset);
-//      
-//      while (dstart[s->sh_offset + r]){
-//        int nr = 0;
-//        snprintf(buff,1023, "%s%n\n", dstart + s->sh_offset + r, &nr);;
-//        locked_print_string(buff, PRINTERR);
-//        r += nr+1;
-//        if (!nr) break;
-//      }
-//      //Scan for 'arg storage' section?
-//      break;}
-
-      case SECTION_PROGBITS:
-        if (streq(elf_sectname((Elf_Addr)dstart, s->sh_name, ehdr),".argroom")){
-          if (verbose) locked_print_string("Found the argument section\n", PRINTERR);
-          //adminstart->argroom_offset = s->sh_offset;
-          adminstart->argroom_size = s->sh_size;
-          //TODO: makes sense?
-        }
-        break;
-
       case SECTION_DYNSYM:
-        if (verbose) locked_print_string("Dynsym:\n", PRINTERR); 
-      case SECTION_SYMTAB:{
-        if (SECTION_DYNSYM == s->sh_type){
         if (verbose) locked_print_string("Setting symbol pointer\n", PRINTERR); 
-          //Note the section, needed later
-          if (symtabind) locked_print_string("Double symtab\n", PRINTERR);
-          symtabind = i;
-          symbolsize = s->sh_entsize;
-          symbase = (struct Elf_Sym*) (dstart + s->sh_offset);
-          symsect = (struct Elf_Shdr*) s;
-        }
+        //Note the section, needed later
+        if (symtabind) locked_print_string("Error: Double symtab\n", PRINTERR);
+        symtabind = i;
+        symbolsize = s->sh_entsize;
+        symbase = (struct Elf_Sym*) (dstart + s->sh_offset);
+        symsect = (struct Elf_Shdr*) s;
+        if (verbose) locked_print_string("Dynsym:\n", PRINTERR); 
 
+      case SECTION_SYMTAB:{
         unsigned  int r=0;
         int c = 0;
         if (s->sh_entsize != sizeof(struct Elf_Sym)) locked_print_string("Size mismatch symtab\n", PRINTERR);
+        if (!verbose){
+          //No printing needed, skip
+          break;
+        }
         while (r < s->sh_size){
           struct Elf_Sym *symt = (struct Elf_Sym*) (dstart + s->sh_offset + r);
           int bind = ELF_SYM_BIND(symt->st_info);
@@ -537,10 +516,12 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       case SECTION_RELA:{
         //Note the needed relocs
         relocs[nr_relocs++] = i;
-        if (verbose) locked_print_string("Found the RELA section\n", PRINTERR);
+        if (verbose) locked_print_string("Found RELA section\n", PRINTERR);
         break;}
       case SECTION_REL:{
-        if (verbose) locked_print_string("Found the REL section\n", PRINTERR);
+        //Note the needed relocs
+        relocs[nr_relocs++] = i;
+        if (verbose) locked_print_string("Found REL section\n", PRINTERR);
         break;}
       default:
         //Nothing of interest
@@ -551,41 +532,65 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
   for (i=0;i<nr_relocs;i++){
     struct Elf_Shdr *s = (struct Elf_Shdr*) (dstart + ehdr->e_shoff + (relocs[i] * sectsize));
     unsigned int r=0;
-    if (s->sh_entsize != sizeof(struct Elf_Rela)) locked_print_string("Size mismatch rela\n", PRINTERR);
+    if ((s->sh_type == SECTION_RELA) &&
+        (s->sh_entsize != sizeof(struct Elf_Rela))) locked_print_string("Size mismatch rel*\n", PRINTERR);
+    if ((s->sh_type == SECTION_REL) &&
+        (s->sh_entsize != sizeof(struct Elf_Rel))) locked_print_string("Size mismatch rel*\n", PRINTERR);
     while (r < s->sh_size){
-      struct Elf_Rela *rela = (struct Elf_Rela*)(dstart + s->sh_offset + r);
-      Elf_Addr * vicloc = (Elf_Addr*) (adminstart->base + rela->r_offset); //add section? relative to what be yeolde offset
-      Elf_Addr newval = 0;
-      Elf_Addr sectloc = *((Elf_Addr*) (adminstart->base + s->sh_offset));
-      int rtype = ELF_REL_TYPE(rela->r_info);
-      int rsym = ELF_REL_SYM(rela->r_info);
-      struct Elf_Sym *sym = (struct Elf_Sym*) (dstart + symsect->sh_offset + (rsym * symbolsize));
-      snprintf(buff, 1023, "Rela:: %p, (+%p), %p: %d, %d\n", rela->r_offset, rela->r_addend, (void*)rela->r_info,
-                                                            rtype,
-                                                            rsym);
-      locked_print_string(buff, PRINTERR);
-
-      const char * tp = "?";
-      switch (rtype){
-        default:
-          break;
-        case (ELF_RR_GLOBDAT):
-          tp = "Glob";
-       break;
-        case (ELF_RR_RELATIVE):
-          tp = "Rel";
-          break;
-        case (ELF_RR_JMPSLOT):
-          tp = "Jmpslot";
-       break;
-
+      Elf_Addr off = 0;
+      Elf_Sxword addend = 0;
+      Elf_Addr info = 0;
+      if (SECTION_RELA == s->sh_type){
+        struct Elf_Rela *rela = (struct Elf_Rela*)(dstart + s->sh_offset + r);
+        off = rela->r_offset;
+        info = rela->r_info;
+        addend = rela->r_addend;
+      } else if (SECTION_REL == s->sh_type){
+        struct Elf_Rel *rel = (struct Elf_Rel*)(dstart + s->sh_offset + r);
+        off = rel->r_offset;
+        info = rel->r_info;
+      } else {
+        continue;
       }
-      newval = /*(*vicloc) +*/ rela->r_addend + adminstart->base /*+ sectloc*/ + sym->st_value;
-      snprintf(buff, 1023, "Changing %s '%s' Size %d: %p <secl:%p, a:0x%x Symv:%p> @%p to %p\n",
-          tp, elf_symname((Elf_Addr)dstart,   symsect,sym,ehdr),sym->st_size,*vicloc,
-                                                                (void*)sectloc, rela->r_addend,sym->st_value, (void*)*vicloc, (void*)newval);
+      int rtype = ELF_REL_TYPE(info);
+      int rsym = ELF_REL_SYM(info);
+
+      //Determine the location of the relocating pointer
+      Elf_Addr * vicloc = (Elf_Addr*) (adminstart->base + off);
+      //The new pointee,calculated just below
+      Elf_Addr newval = 0;
+
+      struct Elf_Sym *sym = (struct Elf_Sym*) (dstart + symsect->sh_offset + (rsym * symbolsize));
+      if (verbose){
+        snprintf(buff, 1023, "Rela:: %p, (+%p), %p: %d, %d\n", off, addend, (void*)info,
+                 rtype, rsym);
+        locked_print_string(buff, PRINTERR);
+      }
+
+      newval = addend + adminstart->base  + sym->st_value;
+      if (verbose){
+        const char * tp = "?";
+        switch (rtype){
+          default:
+            break;
+          case (ELF_RR_GLOBDAT):
+            tp = "Glob";
+         break;
+          case (ELF_RR_RELATIVE):
+            tp = "Rel";
+            break;
+          case (ELF_RR_JMPSLOT):
+            tp = "Jmpslot";
+         break;
+         //This is used for printing the type, logic is the same
+        }
+        snprintf(buff, 1023, "Changing %s '%s' Size %d: %p <a:0x%x Symv:%p> @%p to %p\n",
+            tp, elf_symname((Elf_Addr)dstart,   symsect,sym,ehdr),sym->st_size,*vicloc,
+            addend,sym->st_value, (void*)*vicloc, (void*)newval);
+
+        locked_print_string(buff, PRINTERR);
+      }
       *vicloc = newval;
-      locked_print_string(buff, PRINTERR);
 
       r += s->sh_entsize;
     }

@@ -14,7 +14,8 @@ clean:
 #sim_testprog
 
 SIMC=main_sim.c elf.c basfunc.c loader.c
-sim_out: $(SIMC) ELF.h
+SIMH=ELF.h loader.h loader_api.h basfunc.h
+sim_out: $(SIMC) $(SIMH)
 	$(SLC) $(CFLAGS) -b mta $(SIMC) -o sim_out
 run: sim_out
 	$(SLR) sim_out sim_testprog 2> ll
