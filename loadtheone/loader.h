@@ -2,11 +2,6 @@
 #define H_LOADY
 #include "ELF.h"
 #include <svp/abort.h>
-#define Verify(Expr, Message)                                  \
-  if (!(Expr)) {                                               \
-    fprintf(stderr, "Verification failure: %s\n", (Message) ); \
-    svp_abort();                                                   \
-  }
 #include "ELF.h"
 #include "loader_api.h"
 //
@@ -48,21 +43,14 @@ Elf_Addr locked_newbase(struct admin_s **params);
 #define VERB_INFO 2
 #define VERB_TRACE 3
 
-#define PRINTERROR(str) \
-  if (verbose > VERB_ERR) locked_print_string(str, PRINTERR);
 
-#define PRINTWARN(str) \
-  if (verbose > VERB_WARN) locked_print_string(str, PRINTERR);
+#define ENABLE_DEBUG 1
 
-#define PRINTINFO(str) \
-  if (verbose > VERB_INFO) locked_print_string(str, PRINTERR);
-
-#define PRINTTRACE(str) \
-  if (verbose > VERB_TRACE) locked_print_string(str, PRINTERR);
-
-
-
-
+#define Verify(Expr, Message)                                  \
+  if (!(Expr)) {                                               \
+    fprintf(stderr, "Verification failure: %s\n", (Message) ); \
+    svp_abort();                                                   \
+  }
 
 #endif
 

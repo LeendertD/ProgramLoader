@@ -28,12 +28,7 @@ int nextfreepid = 1;
 void init_admins(void){
   int i;
   for (i=0;i<MAXPROCS;i++){
-    proctable[i].base = 0;
-    proctable[i].pidnum = 0;
-    proctable[i].argc = 0;
-    proctable[i].argv = NULL;
-    proctable[i].envp = NULL;
-
+    ZERO_ADMINP(&proctable[i]);
     proctable[i].nextfreepid = i+1;
   }
   proctable[MAXPROCS-1].nextfreepid = 0;
@@ -85,33 +80,47 @@ int elf_loadfile_p(struct admin_s * params, enum e_settings flags){
   size_t r;
   size_t sr;
   off_t toread;
-  int verbose = flags & e_verbose;
+  int verbose = params->verbose;
   char buff[1024];
 
-  if (verbose) {
+#if ENABLE_DEBUG
+  if (verbose > VERB_INFO){
     snprintf(buff, 1023,"Loading %s\n", params->fname);
     locked_print_string(buff, PRINTERR);
   }
+#endif
   fin = open(params->fname, O_RDONLY);
 
   if (-1 == fin){
-    const char *err = strerror(errno);
-    snprintf(buff, 1023, "File could not be opened: %s\n", err);
-    locked_print_string(buff, PRINTERR);
+#if ENABLE_DEBUG
+    if(verbose > VERB_ERR){
+      const char *err = strerror(errno);
+      snprintf(buff, 1023, "File could not be opened: %s\n", err);
+      locked_print_string(buff, PRINTERR);
+    }
+#endif
     return 0;
   }
   if (fstat(fin, &fstatus)) {
-    const char *err = strerror(errno);
-    snprintf(buff, 1023, "File not statted %s: %s\n", params->fname, err);
-    locked_print_string(buff, PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR){
+      const char *err = strerror(errno);
+      snprintf(buff, 1023, "File not statted %s: %s\n", params->fname, err);
+      locked_print_string(buff, PRINTERR);
+    }
+#endif
     return 0;
   }
   fsize = fstatus.st_size;
   if (fsize < SANE_SIZE){
-    locked_print_string("Filesize too small, not a valid file\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Filesize too small, not a valid file\n", PRINTERR);
+#endif
     return 0;
   }
-  if (verbose) locked_print_string("File opened\n", PRINTERR);
+#if ENABLE_DEBUG
+  if (verbose > VERB_INFO) locked_print_string("File opened\n", PRINTERR);
+#endif
   fdata = malloc(fsize);
 
   //current offset
@@ -126,17 +135,20 @@ int elf_loadfile_p(struct admin_s * params, enum e_settings flags){
         sr += r;
         continue;
       }
-      const char *err = strerror(errno);
-      snprintf(buff, 1023, "Read error: %s, %d of %d read\n",
-                       err, (int)r, (int)fsize);
-      locked_print_string(buff, PRINTERR);
+#if ENABLE_DEBUG
+      if (verbose > VERB_ERR){
+        const char *err = strerror(errno);
+        snprintf(buff, 1023, "Read error: %s, %d of %d read\n",
+                         err, (int)r, (int)fsize);
+        locked_print_string(buff, PRINTERR);
+      }
+#endif
       return 0;
     }
   }
-  if (verbose) locked_print_string("File read\n", PRINTERR);
-
-  /*Data done, close file*/
-  if (verbose) locked_print_string("Closing file\n", PRINTERR);
+#if ENABLE_DEBUG
+  if (verbose> VERB_INFO) locked_print_string("File read\nClosing file\n", PRINTERR);
+#endif
   close(fin);
   fin = -1;
   /*File closed*/
@@ -145,7 +157,9 @@ int elf_loadfile_p(struct admin_s * params, enum e_settings flags){
         flags,
         params
         )){
-    locked_print_string("Elf failure\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Elf failure\n", PRINTERR);
+#endif
   }
   
   free(fdata);
@@ -190,11 +204,13 @@ int elf_header_marshall(char *dstart, size_t size){
   return 0;
 }
 
-int elf_header_check(char *dstart, size_t size){
+int elf_header_check(char *dstart, size_t size, int verbose){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
 
   if ((dstart + size) < (char*)(& ehdr->e_ident[EI_MAG3])) {
-    locked_print_string("Header problem, size too low\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Header problem, size too low\n", PRINTERR);
+#endif
     return -1; // Data too short for reading
   }
 
@@ -205,48 +221,64 @@ int elf_header_check(char *dstart, size_t size){
          ehdr->e_ident[EI_MAG3] == ELFMAG3){
     return 0;
   } else {
-    locked_print_string("invalid ELF file signature", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("invalid ELF file signature", PRINTERR);
+#endif
     return -1;
   }
 }
 
-int elf_header_check_arch(char *dstart, size_t size){
+int elf_header_check_arch(char *dstart, size_t size, int verbose){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   // Check that this file is for our 'architecture'
   if (ehdr->e_ident[EI_VERSION] != EV_CURRENT){
-    locked_print_string("ELF version mismatch", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR)    locked_print_string("ELF version mismatch", PRINTERR);
+#endif
     return -1;
   }
   if (ehdr->e_ident[EI_CLASS] != ELFCLASS){
-    locked_print_string("file is not of proper bitsize", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR)    locked_print_string("file is not of proper bitsize", PRINTERR);
+#endif
     return -1;
   }
   if (ehdr->e_ident[EI_DATA] != ELFDATA){
-    locked_print_string("file is not of proper endianness", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR)    locked_print_string("file is not of proper endianness", PRINTERR);
+#endif
     return -1;
   }
   if (! (ehdr->e_machine == MACHINE_NORMAL ||
          ehdr->e_machine == MACHINE_LEGACY)){
-    locked_print_string("target architecture is not supported", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR)    locked_print_string("target architecture is not supported", PRINTERR);
+#endif
     return -1;
   }
 
-#ifdef CHECK_EXECELF_ENABLETHISTOBREAKSTUFF
-  if (ehdr->e_type != ET_EXEC){
-    locked_print_string("file is not an executable file", PRINTERR);
-    return -1;
-  }
-#endif
+//#ifdef CHECK_EXECELF_ENABLETHISTOBREAKSTUFF
+// if (ehdr->e_type != ET_EXEC){
+//   locked_print_string("file is not an executable file", PRINTERR);
+//   return -1;
+// }
+//#endif
   if (ehdr->e_phoff == 0 || ehdr->e_phnum == 0){
-    locked_print_string("file has no program header", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("file has no program header", PRINTERR);
+#endif
     return -1;
   }
   if (ehdr->e_phentsize != sizeof(struct Elf_Phdr)){
-    locked_print_string("file has an invalid program header", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("file has an invalid program header", PRINTERR);
+#endif
     return -1;
   }
   if (! (ehdr->e_phoff + ehdr->e_phnum * ehdr->e_phentsize <= size)){
-    locked_print_string("file has an invalid program header", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("file has an invalid program header", PRINTERR);
+#endif
     return -1;
   }
   return 0;
@@ -281,8 +313,6 @@ Elf_Addr elf_findbase_marshallphdr(char *dstart, size_t size){
       hasLoadable = 1;
     }
   }
-  // Commented out in original code:
-  // Verify(hasLoadable, "file has no loadable segments");
   return base;
 }
 
@@ -293,15 +323,15 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
   
   Elf_Half i;
   char buff[1024];
-
-  if (verbose) {
+#if ENABLE_DEBUG
+  if (verbose > VERB_INFO) {
     char buff[1024];
     snprintf(buff, 1023,
         "Trying to load program: %p size %p @ %p\n",
         (void*)dstart, (void*)size, (void*)base);
     locked_print_string(buff, PRINTERR);
   }
-
+#endif
   // Then copy the LOAD segments into their right locations
   for (i=0; i < ehdr->e_phnum; ++i){
     if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0){
@@ -323,7 +353,8 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
         Verify(phdr[i].p_offset + phdr[i].p_filesz <= size,
             "file has an invalid segment");
 
-        if (verbose) {
+#if ENABLE_DEBUG
+        if (verbose >VERB_INFO) {
           char buff[1024];
           snprintf(buff, 1023,
               "load F: %d_%d: size %p,%p @ %p with %d\n",
@@ -331,6 +362,7 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
               (void*)phdr[i].p_filesz, act_addr, perm);
           locked_print_string(buff, PRINTERR);
         }
+#endif
         //reserve, prepare data
 #ifndef FLAG_NONEEDODDPERMS
         reserve_range(act_addr, phdr[i].p_memsz, perm |
@@ -345,40 +377,44 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbos
           memset(act_addr + phdr[i].p_filesz, 0, phdr[i].p_memsz - phdr[i].p_filesz-1);
         }
 
-        //LOADING HERE SEEMS NEEDED
-        if (verbose){
+#if ENABLE_DEBUG
+        if (verbose > VERB_TRACE){
           char buff[1024];
           snprintf(buff, 1023,"Loader %p bytes loaded at %p\n",(void*) phdr[i].p_filesz,(void*) act_addr);
           locked_print_string(buff, PRINTERR);
         }
+#endif
       } else {
         /* If the name equals a 'magic' name, remember the address for usage for
          * things like argv, env. Or anything yet to be invented.
          **/
-        if (verbose) {
+#if ENABLE_DEBUG
+        if (verbose > VERB_TRACE) {
           snprintf(buff, 1023, "load U: %d: 0X%x size %p,%p @ %p\n with %d", phdr[i].p_type, i,
           (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
           locked_print_string(buff, PRINTERR);
         }
-        //segment that needs reservation, 2 types exist?
+#endif
+        //segment that needs reservation
         reserve_range((void*)act_addr, phdr[i].p_memsz, perm);
-        
-        //memory.Reserve(phdr[i].p_vaddr, phdr[i].p_memsz, perm);
-        if (verbose){
+#if ENABLE_DEBUG
+        if (verbose > VERB_TRACE){
           snprintf(buff, 1023, "Loader reserved %p bytes at %p\n",(void*) phdr[i].p_memsz,(void*) act_addr);
           locked_print_string(buff, PRINTERR);
         }
+#endif
       }
     }
   }
-  if (verbose){
+#if ENABLE_DEBUG
+  if (verbose > VERB_INFO){
     const char* type = (ehdr->e_machine == MACHINE_LEGACY)? "legacy":"microthreaded";
       
     snprintf(buff, 1023, "Loaded %s ELF binary with virtual base %p entry point %p\n",
         type, (void*)base, (void*)base + ehdr->e_entry);
     locked_print_string(buff, PRINTERR);
   }
-
+#endif
   return 0;
 }
 
@@ -438,11 +474,12 @@ const char *elf_sectname(Elf_Addr base, int num,struct Elf_Ehdr *ehdr){
 }
 
 int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int verbose){
+  (void)size;
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
-  Elf_Addr base = adminstart->base;
+  //Elf_Addr base = adminstart->base;
   Elf_Half sectsize = ehdr->e_shentsize;
   Elf_Half numsects = ehdr->e_shnum;
-  Elf_Off sectoff = ehdr->e_shoff;
+  //Elf_Off sectoff = ehdr->e_shoff;
   Elf_Half strndx = ehdr->e_shstrndx;
   
   int relocs[1024] = {0};
@@ -453,52 +490,83 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
   struct Elf_Shdr*  symsect = NULL;
   Elf_Half i;
   char buff[1024];
-  if (sectsize != sizeof(struct Elf_Shdr)) locked_print_string("SIZE MISMATCH\n", PRINTERR);
+  if (sectsize != sizeof(struct Elf_Shdr)){
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("SIZE MISMATCH\n", PRINTERR);
+#endif
+  }
 
 
-
-  snprintf(buff,1023, "Got %d sections of size %d each Expecting size %lu\n"\
+#if ENABLE_DEBUG
+  if (verbose > VERB_TRACE){
+    snprintf(buff,1023, "Got %d sections of size %d each Expecting size %lu\n"\
                       "Stringtable in section %d\n",
       numsects, sectsize, sizeof(struct Elf_Shdr), strndx);
-  locked_print_string(buff, PRINTERR);
+    locked_print_string(buff, PRINTERR);
 
-  snprintf(buff,1023, "\nSection %3s(%8s): %15s,%6s %14s,%14s,%14s,%14s, %6s,%6s, %14s,%14s\n", "#","Type",
+    snprintf(buff,1023, "\nSection %3s(%8s): %15s,%6s %14s,%14s,%14s,%14s, %6s,%6s, %14s,%14s\n", "#","Type",
         "Name",
         "Type#", "Flags", "Addr", "Off", "Size", "Link", "Info", "Align", "Entsize");
-  locked_print_string(buff, PRINTERR);
+    locked_print_string(buff, PRINTERR);
+  }
+#endif
 
   for (i=0;i<numsects;i++){
     //Loop over the sections, check their need for further processing.
     struct Elf_Shdr *s = (struct Elf_Shdr*) (dstart + ehdr->e_shoff + (i*sectsize));
-    snprintf(buff,1023, "Section %3d(%8s): %15s,%6u, %14lu,%14lu,%14lu,%14lu, %6u,%6u, %14lu,%14lu\n", i,elf_sectiontype(s->sh_type),
-        elf_sectname((Elf_Addr)dstart, s->sh_name, ehdr),
-        s->sh_type, s->sh_flags, s->sh_addr, s->sh_offset, s->sh_size, s->sh_link, s->sh_info, s->sh_addralign, s->sh_entsize);
-    locked_print_string(buff, PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_TRACE){
+      snprintf(buff,1023, "Section %3d(%8s): %15s,%6u, %14lu,%14lu,%14lu,%14lu, %6u,%6u, %14lu,%14lu\n", i,elf_sectiontype(s->sh_type),
+          elf_sectname((Elf_Addr)dstart, s->sh_name, ehdr),
+          s->sh_type, s->sh_flags, s->sh_addr, s->sh_offset, s->sh_size, s->sh_link, s->sh_info, s->sh_addralign, s->sh_entsize);
+      locked_print_string(buff, PRINTERR);
+    }
+#endif
     switch (s->sh_type){
       case SECTION_DYNSYM:
-        if (verbose) locked_print_string("Setting symbol pointer\n", PRINTERR); 
+#if ENABLE_DEBUG
+        if (verbose > VERB_TRACE) locked_print_string("Setting (Dyn)symbol pointer\n", PRINTERR); 
+        if (symtabind && (verbose > VERB_ERR)) locked_print_string("Error: Double symtab\n", PRINTERR);
+#endif
         //Note the section, needed later
-        if (symtabind) locked_print_string("Error: Double symtab\n", PRINTERR);
         symtabind = i;
         symbolsize = s->sh_entsize;
         symbase = (struct Elf_Sym*) (dstart + s->sh_offset);
         symsect = (struct Elf_Shdr*) s;
-        if (verbose) locked_print_string("Dynsym:\n", PRINTERR); 
 
       case SECTION_SYMTAB:{
         unsigned  int r=0;
         int c = 0;
-        if (s->sh_entsize != sizeof(struct Elf_Sym)) locked_print_string("Size mismatch symtab\n", PRINTERR);
-        if (!verbose){
-          //No printing needed, skip
-          break;
-        }
+        if ((verbose > VERB_ERR) && (s->sh_entsize != sizeof(struct Elf_Sym))) locked_print_string("Size mismatch symtab\n", PRINTERR);
         while (r < s->sh_size){
           struct Elf_Sym *symt = (struct Elf_Sym*) (dstart + s->sh_offset + r);
           int bind = ELF_SYM_BIND(symt->st_info);
           int type = ELF_SYM_TYPE(symt->st_info);
+          const char *name = elf_symname((Elf_Addr)dstart, s, symt,ehdr);
+          if (streq(ROOM_ENV,name)){
+            //Env room
+            adminstart->envroom_offset = adminstart->base + symt->st_value;
+            adminstart->envroom_size = symt->st_size;
+#if ENABLE_DEBUG
+            if (verbose > VERB_TRACE){
+              snprintf(buff, 1023, "Envroom: %s@%p<%p>--> %p\n",name,(void*)symt->st_value, (void*)symt->st_size, (void*)adminstart->envroom_offset);
+              locked_print_string(buff, PRINTERR);
+            }
+#endif
+          } else if (streq(ROOM_ARGV,name)){
+            //Env room
+            adminstart->argroom_offset = adminstart->base + symt->st_value;
+            adminstart->argroom_size = symt->st_size;
+#if ENABLE_DEBUG
+            if (verbose > VERB_TRACE){
+              snprintf(buff, 1023, "Argroom: %s@%p<%p>--> %p\n",name,(void*)symt->st_value, (void*)symt->st_size, (void*)adminstart->argroom_offset);
+              locked_print_string(buff, PRINTERR);
+            }
+#endif
+          }
+#if ENABLE_DEBUG
           snprintf(buff, 1023, "Sym %3d: %15s(%d) %17p of size %5lu, %3d<%2d,%2d> %3d, %8d\n", c,
-              elf_symname((Elf_Addr)dstart, s, symt,ehdr),
+              name,
               symt->st_name,
               (void*)symt->st_value,
               symt->st_size,
@@ -508,6 +576,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
               symt->st_shndx
               );
           locked_print_string(buff, PRINTERR);
+#endif
           c++;
           r += s->sh_entsize;
         }
@@ -516,12 +585,16 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       case SECTION_RELA:{
         //Note the needed relocs
         relocs[nr_relocs++] = i;
-        if (verbose) locked_print_string("Found RELA section\n", PRINTERR);
+#if ENABLE_DEBUG
+        if (verbose > VERB_TRACE) locked_print_string("Found RELA section\n", PRINTERR);
+#endif
         break;}
       case SECTION_REL:{
         //Note the needed relocs
         relocs[nr_relocs++] = i;
-        if (verbose) locked_print_string("Found REL section\n", PRINTERR);
+#if ENABLE_DEBUG
+        if (verbose > VERB_TRACE) locked_print_string("Found REL section\n", PRINTERR);
+#endif
         break;}
       default:
         //Nothing of interest
@@ -532,10 +605,12 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
   for (i=0;i<nr_relocs;i++){
     struct Elf_Shdr *s = (struct Elf_Shdr*) (dstart + ehdr->e_shoff + (relocs[i] * sectsize));
     unsigned int r=0;
+#if ENABLE_DEBUG
     if ((s->sh_type == SECTION_RELA) &&
         (s->sh_entsize != sizeof(struct Elf_Rela))) locked_print_string("Size mismatch rel*\n", PRINTERR);
     if ((s->sh_type == SECTION_REL) &&
         (s->sh_entsize != sizeof(struct Elf_Rel))) locked_print_string("Size mismatch rel*\n", PRINTERR);
+#endif
     while (r < s->sh_size){
       Elf_Addr off = 0;
       Elf_Sxword addend = 0;
@@ -561,14 +636,17 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       Elf_Addr newval = 0;
 
       struct Elf_Sym *sym = (struct Elf_Sym*) (dstart + symsect->sh_offset + (rsym * symbolsize));
-      if (verbose){
-        snprintf(buff, 1023, "Rela:: %p, (+%p), %p: %d, %d\n", off, addend, (void*)info,
+#if ENABLE_DEBUG
+      if (verbose > VERB_TRACE){
+        snprintf(buff, 1023, "Rela:: %p, (+%p), %p: %d, %d\n", (void*)off, (void*)addend, (void*)info,
                  rtype, rsym);
         locked_print_string(buff, PRINTERR);
       }
+#endif
 
       newval = addend + adminstart->base  + sym->st_value;
-      if (verbose){
+#if ENABLE_DEBUG
+      if (verbose > VERB_TRACE){
         const char * tp = "?";
         switch (rtype){
           default:
@@ -584,12 +662,13 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
          break;
          //This is used for printing the type, logic is the same
         }
-        snprintf(buff, 1023, "Changing %s '%s' Size %d: %p <a:0x%x Symv:%p> @%p to %p\n",
-            tp, elf_symname((Elf_Addr)dstart,   symsect,sym,ehdr),sym->st_size,*vicloc,
-            addend,sym->st_value, (void*)*vicloc, (void*)newval);
+        snprintf(buff, 1023, "Changing %s '%s' Size %lu: %p <a:0x%x Symv:%p> @%p to %p\n",
+            tp, elf_symname((Elf_Addr)dstart,   symsect,sym,ehdr),sym->st_size,(void*)(*vicloc),
+            (unsigned int)addend,(void*)sym->st_value, (void*)*vicloc, (void*)newval);
 
         locked_print_string(buff, PRINTERR);
       }
+#endif
       *vicloc = newval;
 
       r += s->sh_entsize;
@@ -602,12 +681,13 @@ int elf_spawn(char *dstart, size_t size, struct admin_s *adminstart,
               int verbose, enum e_settings flags){
   Elf_Addr base = adminstart->base;
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
-  if (verbose) {
+#if ENABLE_DEBUG
+  if (verbose > VERB_INFO) {
     char buff[1024];
     snprintf(buff, 1023, "Spawning program from %p of size %p with flags %d\n", (void*)dstart, (void*) size, flags);
     locked_print_string(buff, PRINTERR);
   }
-
+#endif
   function_spawn((main_function_t*) ((char*)base + ehdr->e_entry),
       adminstart);
   return 0;
@@ -619,14 +699,26 @@ static size_t strsize(char *in){
   return s + 1;//Null byte inc.
 }
 
-Elf_Addr argsize(int argc, char** argv,char * envp){
+int argsizecheck(int argc, char** argv,char * envp, Elf_Addr asize, Elf_Addr esize, int verbose){
   int i=0;
+  int rv = 0;
   size_t si = sizeof(char*) * (1 + argc);
   //Argv
   for (i=0;i<argc;i++){
     si += strsize(argv[i]);
   }
+  if (si > asize){
+    rv |= 1;
+  }
 
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) {
+      char buff[1024];
+      snprintf(buff,1023, "Argroom needed %lu, %lu available\n",si, asize);
+      locked_print_string(buff, PRINTERR);
+    }
+#endif
+  si = 0;
   i = 0;
   while (envp && (envp[i] || envp[i+1])){
     i++;
@@ -634,42 +726,59 @@ Elf_Addr argsize(int argc, char** argv,char * envp){
   }
   si += 2;
 
-  return si;
+
+  if (si > esize){
+    rv |= 2;
+  }
+
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) {
+      char buff[1024];
+      snprintf(buff,1023, "Envroom needed %lu, %lu available\n",si, esize);
+      locked_print_string(buff, PRINTERR);
+    }
+#endif
+  return rv;
 }
 
-int argsave(Elf_Addr start,struct admin_s *ab,int argc, char** argv,char * envp){
-  int i=0;
-  char **acpp = (char **)start;
-  char *cpnt = (char*) (start + (sizeof(char*) *(argc + 1)));
+int argsave(struct admin_s *ab,int argc, char** argv,char * envp){
+  char **acpp = (char **)ab->argroom_offset;
+  char *cpnt = (char*) (ab->argroom_offset + (sizeof(char*) *(argc + 1)));
   ab->argc = argc;
   ab->argv = acpp;
   //Argv
-  for (i=0;i<argc;i++){
-    int k;
-    acpp[i] = cpnt;//Argv
-    acpp[i+1] = NULL;
-    *cpnt = 0;
-
-    //Now copy the string
-    k = 0;
-    while (argv && argv[i] && (argv[i])[k]){
-      *cpnt = (argv[i])[k];
-      cpnt++;
+  if (ab->argroom_size){
+    int i=0;
+    for (i=0;i<argc;i++){
+      int k;
+      acpp[i] = cpnt;//Argv
+      acpp[i+1] = NULL;
       *cpnt = 0;
-      k++;
+  
+      //Now copy the string
+      k = 0;
+      while (argv && argv[i] && (argv[i])[k]){
+        *cpnt = (argv[i])[k];
+        cpnt++;
+        *cpnt = 0;
+        k++;
+      }
+      cpnt++;//Room for nullbyte at arg end
     }
-    cpnt++;//Room for nullbyte at arg end
+    cpnt++;
   }
-  cpnt++;
 
-  i = 0;
-  ab->envp = cpnt;
-  while (envp && (envp[i] || envp[i+1])){
-    cpnt[i] = envp[i];
-    i++;
+  if (ab->envroom_size){
+    int i = 0;
+    ab->envp = (char*)ab->envroom_offset;
+    cpnt = ab->envp;
+    while (envp && (envp[i] || envp[i+1])){
+      cpnt[i] = envp[i];
+      i++;
+    }
+    cpnt[i] = 0;
+    cpnt[i+1] = 0;
   }
-  cpnt[i] = 0;
-  cpnt[i+1] = 0;
 
   return 0;
 }
@@ -699,72 +808,95 @@ int elf_loadprogram_p(char *data, size_t size, int verbose,
   locked_newbase(&p);
   
   if (elf_header_marshall(data,size)){
-    locked_print_string("Marshalling failed\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Marshalling failed\n", PRINTERR);
+#endif
     return -1;
   }
-  if (elf_header_check(data,size)){
-    locked_print_string("Header checking failed\n", PRINTERR);
+  if (elf_header_check(data,size, verbose)){
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Header checking failed\n", PRINTERR);
+#endif
     return -1;
   }
-  if (elf_header_check_arch(data,size)){
-    locked_print_string("Architecture check failed\n", PRINTERR);
+  if (elf_header_check_arch(data,size, verbose)){
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Architecture check failed\n", PRINTERR);
+#endif
     return -1;
   }
 
   relbase = elf_findbase_marshallphdr(data, size);
-  if (verbose) {
+#if ENABLE_DEBUG
+  if (verbose > VERB_TRACE) {
     char buff[1024];
     snprintf(buff, 1023, "base_file: %p\n", (void*)relbase);
     locked_print_string(buff, PRINTERR);
   }
-
-  //Elf_Addr theargsize = argsize(p->argc, p->argv, p->envp);
-  //Prepare storage for argv and env
-  //IN A MAGIC ELF SECTION TODO
-  //base = (Elf_Addr)reserve_range((void*)p->base, adminsize, perm_read|perm_write);
+#endif
   
 
   p->fname = params->fname;
   p->core_start = params->core_start;
   p->core_size = params->core_size;
 
-  //magic loading, until then:
-  p->argc = 0;
-  p->argv = NULL;
-  p->envp = NULL;
-  
   p->base += relbase;//correct for elf base
   //force Allignment
   static const int PAGE_SIZE = 4096;
   p->base = p->base & -PAGE_SIZE;
   
-  if (verbose) {
+#if ENABLE_DEBUG
+  if (verbose > VERB_TRACE) {
     char buff[1024];
     snprintf(buff, 1023, "base_used: %p\n", (void*)p->base);
     locked_print_string(buff, PRINTERR);
   }
-
-  /*
-  if (argsave(((Elf_Addr)adminstart) + sizeof(struct admin_s),
-              adminstart,
-              p->argc,
-              p->argv,
-              p->envp)){
-    locked_print_string("Problem in argument construction\n", PRINTERR);
-  }*/
-
+#endif
+  
   if (elf_loadit(data, size, p, verbose)){
-    locked_print_string("Elf loading failed\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR)  locked_print_string("Elf loading failed\n", PRINTERR);
+#endif
     return -1;
   }
 
   if (elf_sectionscan(data, size, p, verbose)){
-    locked_print_string("Elf sections failed\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Elf sections failed\n", PRINTERR);
+#endif
     return -1;
+  }
+
+
+  //magic loading, fallback to NO ARGS:
+  p->argc = 0;
+  p->argv = NULL;
+  p->envp = NULL;
+  
+  if (argsizecheck(params->argc, params->argv, params->envp, p->envroom_size, p->argroom_size,  verbose)){
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) {
+      locked_print_string("Arguments while not enough room available\n", PRINTERR);
+    }
+#endif
+  } else {
+    if (argsave(p,
+                params->argc,
+                params->argv,
+                params->envp)){
+#if ENABLE_DEBUG
+      if (verbose > VERB_ERR){
+        locked_print_string("Problem in argument construction\n", PRINTERR);
+      }
+#endif
+      
+    }
   }
   
   if (elf_spawn(data, size, p, verbose, flags)){
-    locked_print_string("Elf spawning failed\n", PRINTERR);
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) locked_print_string("Elf spawning failed\n", PRINTERR);
+#endif
     return -1;
   }
 

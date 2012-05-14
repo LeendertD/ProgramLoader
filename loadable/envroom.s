@@ -16,14 +16,14 @@
         .section .argroom,"a",@progbits
         .set volatile
         
-        .equ SIZE_ARGV, 0x100000       
+        .equ SIZE_ENV, 0x100000       
 
-        .globl room_argv
-        .type	room_argv, @object
-        .size	room_argv, SIZE_ARGV
+        .globl room_env
+        .type	room_env, @object
+        .size	room_env, SIZE_ENV
 
 
         #Alligned memory, to ease pointer storage
         .align 8
-        room_argv:
-       	.zero	SIZE_ARGV
+        room_env:
+       	.zero	SIZE_ENV

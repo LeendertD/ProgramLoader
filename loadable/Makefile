@@ -1,6 +1,6 @@
 all: tinyex spawny printy fourtwo
 
-CRT=crt_simple.s argroom.s
+CRT=crt_simple.s argroom.s envroom.s
 #argroom.s
 CC=slc -nostdlib -fPIC -fpic -Wl,-shared
 

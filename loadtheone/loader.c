@@ -21,11 +21,6 @@ int parse_setting(const char* key, const char* val,
     *settings |= e_noprogname;
     return 0;
   }
-  if (streq(key, "verbose") &&
-      streq(val, "true")){
-    *settings |= e_verbose;
-    return 0;
-  }
   if (streq(key, "core_start")){
     out->core_start = strtoul(val, NULL, 0);
     return 0;
@@ -36,6 +31,16 @@ int parse_setting(const char* key, const char* val,
   }
   if (streq(key, "filename")){
     out->fname = strdup(val);
+    return 0;
+  }
+
+  if (streq(key, "verbose") &&
+      streq(val, "true")){
+    out->verbose = VERB_TRACE + 1;
+    return 0;
+  }
+  if (streq(key, "verbose")){
+    out->verbose = strtol(val, NULL,0);
     return 0;
   }
 
@@ -157,8 +162,6 @@ int read_env(int fd, struct admin_s *out){
     i++;
   }
 
-  locked_print_string("HIER::", 1);
-  locked_print_string(out->envp, 1);
   return 0;
 }
 
@@ -199,12 +202,15 @@ int read_argv(int fd, struct admin_s *out){
       case '\n':
         buff[i] = 0;
         if (buff[0] == 0){
-          locked_print_string("End of args", 1);
+#if ENABLE_DEBUG
+          if (out->verbose > VERB_TRACE){
+            locked_print_string("End of args", PRINTERR);
+          }
+#endif
           return 0;
         }
         //append
         out->argv[out->argc] = strdup(buff);
-        locked_print_string(out->argv[out->argc], 1);
         out->argc++;
         out->argv = realloc(out->argv, (1 + out->argc) * sizeof(char*));
         out->argv[out->argc] = NULL;
@@ -219,22 +225,22 @@ int read_argv(int fd, struct admin_s *out){
 
 void elf_fromconf(int fd){
   struct admin_s params;
-  params.fname = NULL;
-  params.argc = 0;
-  params.argv = NULL;
-  params.envp = NULL;
+  ZERO_ADMINP(&params);
   params.core_start = 0;
   params.core_size = 1;
+  params.verbose = VERB_WARN+1;
   int settings = read_settings(fd, &params);
   read_argv(fd, &params);
   if (!params.fname) {
-    locked_print_string("No filename in config to run\n", 1);
-    locked_print_string("No filename in config to run\n", 2);
+#if ENABLE_DEBUG
+    locked_print_string("No filename in config to run\n", PRINTERR);
+#endif
     return;
   }
   if (read_env(fd, &params)){
-    locked_print_string("Problems reading env from config\n", 1);
-    locked_print_string("Problems reading env from config\n", 2);
+#if ENABLE_DEBUG
+    locked_print_string("Problems reading env from config\n", PRINTERR);
+#endif
     return;
   }
 
@@ -252,6 +258,7 @@ void elf_fromconf(int fd){
   free(params.argv);
   free(params.envp);
 }
+
 void elf_fromconfname(const char *fn){
   int fd = open(fn, O_RDONLY);
   elf_fromconf(fd);
@@ -259,8 +266,10 @@ void elf_fromconfname(const char *fn){
 }
 
 enum handled_by elf_clientbreakpoint(int id, const char *msg){
-  locked_print_string(msg, PRINTERR);
-  locked_print_int(id, PRINTERR);
+  (void)id;
+  (void)msg;
+  //locked_print_string(msg, PRINTERR);
+  //locked_print_int(id, PRINTERR);
   //....
   return HANDLED_USER;
 }

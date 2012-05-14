@@ -1,6 +1,6 @@
 #!/bin/sh
-CRT=crt_simple.s
-ARG=argroom.s
+CRT="crt_simple.s"
+ARG="argroom.s envroom.s"
 CC="slc -nostdlib -fPIC -fpic"
 CFLAGS=`../gcflags`
 

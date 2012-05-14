@@ -1,21 +1,26 @@
 #ifndef H_LOADAPI_A
 #define H_LOADAPI_A
-
+#include <time.h>
 
 #define MAKE_CLUSTER_ADDR(First, Size) ((First)*2 + (Size))
 
 #define PRINTERR 2
 #define PRINTOUT 1
 #define base_off (Elf_Addr)0x0010000000000000
+
+
+#define ROOM_ENV "room_env"
+#define ROOM_ARGV "room_argv"
+
 enum e_settings {
-  e_noprogname = 1,
-  e_verbose    = 1 << 1
+  e_noprogname = 1
 };
 
 struct admin_s {
   int pidnum;
+  int verbose;
   //Elf_Addr base;
-  long base;
+  unsigned long base;
   char *fname;
   int core_start;
   int core_size;
@@ -23,11 +28,38 @@ struct admin_s {
   char **argv;
   char *envp;
 
-  long argroom_offset;
-  long argroom_size;
+  clock_t createtick;
+  clock_t detachtick;
+  clock_t lasttick;
+  clock_t cleaneduptick;
+
+
+  unsigned long argroom_offset;
+  unsigned long argroom_size;
+  unsigned long envroom_offset;
+  unsigned long envroom_size;
 
   int nextfreepid;
 };
+
+#define ZERO_ADMINP(x)\
+  (x)->pidnum = 0;\
+  (x)->verbose = 0;\
+  (x)->base = 0;\
+  (x)->fname = 0;\
+  (x)->core_start = 0;\
+  (x)->core_size = 0;\
+  (x)->argc = 0;\
+  (x)->argv = 0;\
+  (x)->envp = 0;\
+  (x)->createtick = 0;\
+  (x)->detachtick = 0;\
+  (x)->cleaneduptick = 0;\
+  (x)->argroom_offset = 0;\
+  (x)->argroom_size = 0;\
+  (x)->envroom_offset = 0;\
+  (x)->envroom_size = 0;\
+  (x)->nextfreepid = 0;
 
 enum handled_by {
   HANDLED_NO = 0,
