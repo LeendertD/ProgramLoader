@@ -116,19 +116,30 @@ sl_def(thread_function,,
   char *e = params->envp;
   struct loader_api_s *p = &loader_api;
   
-  char buff[1024];
   int exit_code = (*f)(ac, av, e, p);
-  //int exit_code = fakemain(ac, av, e);
+
+#if ENABLE_CLOCKCALLS
+  params->lasttick = clock();
+#endif
   
   if (exit_code != 0){
     /* Some feedback about termination */
-    snprintf(buff, 1023, "program terminated with code %d\n", exit_code);
-    locked_print_string(buff, PRINTERR);
+#if ENABLE_DEBUG
+    if (params->verbose > VERB_ERR){
+      char buff[1024];
+      snprintf(buff, 1023, "program terminated with code %d\n", exit_code);
+      locked_print_string(buff, PRINTERR);
+    }
+#endif
   }
 
-  snprintf(buff, 1023, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
-  locked_print_string(buff, PRINTERR);
-
+#if ENABLE_DEBUG
+  if (params->verbose > VERB_INFO){ 
+      char buff[1024];
+      snprintf(buff, 1023, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
+    locked_print_string(buff, PRINTERR);
+  }
+#endif
   locked_delbase(params->pidnum);
 }
 sl_enddef
@@ -166,9 +177,21 @@ int function_spawn(main_function_t * main_f,
   
   char buff[1024];
   buff[0] = 0;
-  snprintf(buff, 1023,
+#if ENABLE_DEBUG
+  if (params->verbose > VERB_INFO){
+    snprintf(buff, 1023,
       "To cores: %d @ %d\n",params->core_size, params->core_start);
-  locked_print_string(buff, PRINTERR);
+    locked_print_string(buff, PRINTERR);
+  }
+#endif
+  //There are core placement specs
+  int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
+
+  //Could be moved beyond the create, but the thread MIGHT be running already
+  //need to check the docs
+#if ENABLE_CLOCKCALLS
+  params->detachtick = clock();
+#endif
   if (params->core_start == -1){
     //Autocore, or actually just 'here'
     sl_create( , , , , , , , thread_function, 
@@ -177,8 +200,6 @@ int function_spawn(main_function_t * main_f,
     );
     sl_detach();
   } else {
-    //There are core placement specs
-    int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
 
     sl_create( ,cad, , , , , , thread_function, 
       sl_glarg(main_function_t* ,, main_f),

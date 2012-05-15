@@ -22,7 +22,16 @@ const char *strs[] = {
 };
 
 const char * a = "123456";
-
+int dudewheresmycard(void){
+  return 43;
+}
+int iaintfoundit(void){
+  int a;
+  a=0;
+  a=2;
+  a=dudewheresmycard();
+  return a;
+}
 int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   int (*s)(const char*,enum e_settings, int,char**,char*);
   void (*output_string)(const char *, int) = api->print_string;

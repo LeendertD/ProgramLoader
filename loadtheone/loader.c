@@ -36,6 +36,7 @@ int parse_setting(const char* key, const char* val,
 
   if (streq(key, "verbose") &&
       streq(val, "true")){
+    locked_print_string("Warning verbosity set to quite high\n",PRINTERR);
     out->verbose = VERB_TRACE + 1;
     return 0;
   }
@@ -228,7 +229,7 @@ void elf_fromconf(int fd){
   ZERO_ADMINP(&params);
   params.core_start = 0;
   params.core_size = 1;
-  params.verbose = VERB_WARN+1;
+  params.verbose = VERB_TRACE+1;
   int settings = read_settings(fd, &params);
   read_argv(fd, &params);
   if (!params.fname) {

@@ -13,7 +13,9 @@
 #define ROOM_ARGV "room_argv"
 
 enum e_settings {
-  e_noprogname = 1
+  e_noprogname = 1,
+  e_timeit = 1 << 2
+
 };
 
 struct admin_s {
@@ -28,11 +30,19 @@ struct admin_s {
   char **argv;
   char *envp;
 
+  //If set, set at PID allocation
   clock_t createtick;
+
+  //If set, set at detach (control transfer)
   clock_t detachtick;
+
+  //If set, set right after lmain returns
   clock_t lasttick;
+
+  //If set, just before the PID is freed to the loader and printing of times
   clock_t cleaneduptick;
 
+  void (*timecallback)(void);
 
   unsigned long argroom_offset;
   unsigned long argroom_size;
@@ -43,6 +53,7 @@ struct admin_s {
 };
 
 #define ZERO_ADMINP(x)\
+  (x)->timecallback = 0;\
   (x)->pidnum = 0;\
   (x)->verbose = 0;\
   (x)->base = 0;\

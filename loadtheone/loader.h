@@ -5,6 +5,20 @@
 #include "ELF.h"
 #include "loader_api.h"
 //
+//
+
+#define VERB_ERR 0
+#define VERB_WARN 1
+#define VERB_INFO 2
+#define VERB_TRACE 3
+
+
+#define ENABLE_DEBUG 1
+#define ENABLE_CLOCKCALLS 1
+
+
+//
+//
 typedef int (main_function_t)(int argc, char **argv, char *envp, void* spwn);
 
 void locked_print_int(int val, int fp);
@@ -19,7 +33,7 @@ int elf_loadprogram(char*, size_t, int verbose,
                     enum e_settings,
                     int argc, char **argv, char *env
     );
-int elf_loadprogram_p(char*, size_t, int verbose,
+int elf_loadprogram_p(char*, size_t,
                     enum e_settings,
                     struct admin_s *
     );
@@ -35,16 +49,6 @@ int elf_loadfile_p(struct admin_s *, enum e_settings);
 void locked_delbase(int deadpid);
 Elf_Addr locked_newbase(struct admin_s **params);
 
-
-//These are macro based locked_print_strings, which check verbosity (verbose) needs to be
-//defined in the scope of usage
-#define VERB_ERR 0
-#define VERB_WARN 1
-#define VERB_INFO 2
-#define VERB_TRACE 3
-
-
-#define ENABLE_DEBUG 1
 
 #define Verify(Expr, Message)                                  \
   if (!(Expr)) {                                               \

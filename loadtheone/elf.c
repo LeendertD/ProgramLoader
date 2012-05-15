@@ -14,6 +14,7 @@
 #include "basfunc.h"
 #include "loader.h"
 #include <unistd.h>
+#include <time.h>
 
 #define NODE_BASELOCK 3
 
@@ -62,10 +63,37 @@ Elf_Addr locked_newbase(struct admin_s **params){
   sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, slbase_fn, sl_glarg(struct admin_s**, params, params));
   sl_sync();
 
+  //As soon as possible without blocking others, note te 'time'
+#if ENABLE_CLOCKCALLS
+  (*params)->createtick = clock();
+#endif
   return (*params)->base;
 }
 
 void locked_delbase(int deadpid){
+
+#if ENABLE_CLOCKCALLS
+  //Ready to DELETE the pid, last chance to acces data
+  proctable[deadpid].cleaneduptick = clock();
+  if (proctable[deadpid].timecallback) proctable[deadpid].timecallback();
+
+#if ENABLE_DEBUG
+  if (1||(proctable[deadpid].verbose > VERB_INFO)){
+    char buff[1024];
+    snprintf(buff, 1023, "Clocks: %d start @%lu: c2d:%lu, c2l:%lu, c2c:%lu ...%d\n",
+        deadpid,
+      proctable[deadpid].createtick,
+      proctable[deadpid].detachtick - proctable[deadpid].createtick,
+      proctable[deadpid].lasttick - proctable[deadpid].createtick,
+      proctable[deadpid].cleaneduptick - proctable[deadpid].createtick,
+      proctable[deadpid].verbose 
+      );
+    locked_print_string(buff, PRINTERR);
+  }
+  //debug
+#endif
+  //clockcalls
+#endif
   sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
   sl_sync();
 }
@@ -153,7 +181,7 @@ int elf_loadfile_p(struct admin_s * params, enum e_settings flags){
   fin = -1;
   /*File closed*/
 
-  if (elf_loadprogram_p(fdata, fsize, verbose,
+  if (elf_loadprogram_p(fdata, fsize,
         flags,
         params
         )){
@@ -316,11 +344,11 @@ Elf_Addr elf_findbase_marshallphdr(char *dstart, size_t size){
   return base;
 }
 
-int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart, int verbose){
+int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
   struct Elf_Phdr *phdr = (struct Elf_Phdr*) (dstart + ehdr->e_phoff);
   Elf_Addr base = adminstart->base;
-  
+  int verbose = adminstart->verbose;
   Elf_Half i;
   char buff[1024];
 #if ENABLE_DEBUG
@@ -793,18 +821,20 @@ int elf_loadprogram(char* data, size_t size, int verbose,
   params.base = 0;
   params.core_start = -1;
   params.core_size = -1;
+  params.verbose = verbose;
 
   params.argc = argc;
   params.argv = argv;
   params.envp = envp;
 
-  return elf_loadprogram_p(data, size, verbose, flags, &params);
+  return elf_loadprogram_p(data, size, flags, &params);
 }
 
-int elf_loadprogram_p(char *data, size_t size, int verbose,
+int elf_loadprogram_p(char *data, size_t size,
     enum e_settings flags, struct admin_s * params){
   Elf_Addr relbase;
   struct admin_s *p = NULL;
+  int verbose = params->verbose;
   locked_newbase(&p);
   
   if (elf_header_marshall(data,size)){
@@ -836,9 +866,11 @@ int elf_loadprogram_p(char *data, size_t size, int verbose,
 #endif
   
 
+  //Set transferablesettings
   p->fname = params->fname;
   p->core_start = params->core_start;
   p->core_size = params->core_size;
+  p->verbose = params->verbose;
 
   p->base += relbase;//correct for elf base
   //force Allignment
@@ -853,7 +885,7 @@ int elf_loadprogram_p(char *data, size_t size, int verbose,
   }
 #endif
   
-  if (elf_loadit(data, size, p, verbose)){
+  if (elf_loadit(data, size, p)){
 #if ENABLE_DEBUG
     if (verbose > VERB_ERR)  locked_print_string("Elf loading failed\n", PRINTERR);
 #endif
