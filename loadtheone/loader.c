@@ -13,7 +13,7 @@
 #include "basfunc.h"
 
 int parse_setting(const char* key, const char* val,
-  int *settings,
+  unsigned long *settings,
   struct admin_s *out){
 
   if (streq(key, "noprogname") &&
@@ -44,20 +44,24 @@ int parse_setting(const char* key, const char* val,
     out->verbose = strtol(val, NULL,0);
     return 0;
   }
+  if (streq(key, "timeit") &&
+      streq(val, "true")){
+    *settings |= e_timeit;
+    return 0;
+  }
 
   return -1;
 }
 
 int read_settings(int fd, struct admin_s *out){
-  int settings = 0;
   char b;
   int i;
   char *buff;
   char abuff[1024];
   char bbuff[1024];
   int mode, esc;
-  if (fd == -1) return settings;
-  if (read(fd,0,0)) return settings;
+  if (fd == -1) return -1;
+  if (read(fd,0,0)) return -1;
   abuff[0] = bbuff[0] = 0;
   i = 0;
   mode = 0;
@@ -87,8 +91,8 @@ int read_settings(int fd, struct admin_s *out){
         i = -1;
 
         //set settin
-        val = parse_setting(abuff, bbuff, &settings, out);
-        if (val) return settings;
+        val = parse_setting(abuff, bbuff, &(out->settings), out);
+        if (val) return 0;
         abuff[0] = bbuff[0] = 0;
 
         break;
@@ -105,12 +109,11 @@ int read_settings(int fd, struct admin_s *out){
 
     i++;
   }
-  return settings;
+  return 0;
 }
 
 int read_env(int fd, struct admin_s *out){
   int i = 0;
-  int w = 0;
   int esc = 0;
   char b = 1;
   off_t osta = 0;
@@ -147,6 +150,13 @@ int read_env(int fd, struct admin_s *out){
           if (! read(fd, &b, 1)) break;
           //Continue into newline
         }
+        if (i==0){
+          //first character a comment, no nullbyte needed
+          i = -1;
+        } else {
+          //no double nullbytes due to comments please...
+          if (! out->envp[i-1]) i--;
+        }
         break;
       case '\\':
         esc = 1;
@@ -154,14 +164,24 @@ int read_env(int fd, struct admin_s *out){
         continue;
         break;
       case '\n':
-        w = i;
         out->envp[i] = 0;
+
+        //Dual nullbyte is a final terminator
+        if (! out->envp[i-1]) b = 0;
+        
         i++;
         continue;
       break;
     }
     i++;
   }
+
+  if (out->envp[0] == 0){
+    //No env
+    free(out->envp);
+    out->envp = NULL;
+  }
+
 
   return 0;
 }
@@ -191,6 +211,15 @@ int read_argv(int fd, struct admin_s *out){
        case '#':
         while (buff[i] != '\n'){
           buff[i] = 0;
+          if (i==0){
+            //no empty arg due to comment
+            i = -1;
+          } else {
+            if (buff[i-1] == 0){
+              //no empty args due to comments please
+              i--;
+            }
+          }
           if (! read(fd, buff+i, 1)) break;
           //Continue into newline
         }
@@ -203,12 +232,8 @@ int read_argv(int fd, struct admin_s *out){
       case '\n':
         buff[i] = 0;
         if (buff[0] == 0){
-#if ENABLE_DEBUG
-          if (out->verbose > VERB_TRACE){
-            locked_print_string("End of args", PRINTERR);
-          }
-#endif
-          return 0;
+          b = 0;
+          break;
         }
         //append
         out->argv[out->argc] = strdup(buff);
@@ -221,37 +246,51 @@ int read_argv(int fd, struct admin_s *out){
     }
     i++;
   }
+
+  //If there is just one entry, check for NULL (which would mean 1 useless
+  //entry)
+  if (out->argc == 1){
+    if (out->argv[0] == NULL){
+      free(out->argv);
+      out->argv = NULL;
+      out->argc= 0;
+    }
+  }
   return 0;
 }
 
 void elf_fromconf(int fd){
+  //Called for reading config
   struct admin_s params;
   ZERO_ADMINP(&params);
   params.core_start = 0;
   params.core_size = 1;
+  //Default verbosity, nice and LOUD
   params.verbose = VERB_TRACE+1;
-  int settings = read_settings(fd, &params);
+  read_settings(fd, &params);
   read_argv(fd, &params);
   if (!params.fname) {
 #if ENABLE_DEBUG
-    locked_print_string("No filename in config to run\n", PRINTERR);
+    //Params have been read, it might have requested silence
+    if (params.verbose > VERB_ERR){
+      locked_print_string("No filename in config to run\n", PRINTERR);
+    }
 #endif
     return;
   }
   if (read_env(fd, &params)){
 #if ENABLE_DEBUG
-    locked_print_string("Problems reading env from config\n", PRINTERR);
+    if (params.verbose > VERB_ERR){
+      locked_print_string("Problems reading env from config\n", PRINTERR);
+    }
 #endif
     return;
   }
 
   int i = 0;
-  /*for (i=0;i < params.argc;i++) {
-    locked_print_string(":", 1);
-    locked_print_string(params.argv[i], 1);
-    locked_print_string(";\n", 1);
-  }*/
-  elf_loadfile_p(&params, settings);
+
+
+  elf_loadfile_p(&params, params.settings);
 
   for (i=0;i < params.argc;i++) {
     free(params.argv[i]);
@@ -262,6 +301,13 @@ void elf_fromconf(int fd){
 
 void elf_fromconfname(const char *fn){
   int fd = open(fn, O_RDONLY);
+
+#if ENABLE_DEBUG
+  //Verbosity information is not available at this stage...
+  char buff[2048];
+  snprintf(buff, 2047,"Program from config %s\n", fn);
+  locked_print_string(buff, PRINTERR);
+#endif
   elf_fromconf(fd);
   close(fd);
 }

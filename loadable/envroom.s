@@ -16,7 +16,7 @@
         .section .argroom,"a",@progbits
         .set volatile
         
-        .equ SIZE_ENV, 0x100000       
+        .equ SIZE_ENV, 0x1000
 
         .globl room_env
         .type	room_env, @object

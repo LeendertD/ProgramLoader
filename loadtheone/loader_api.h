@@ -9,8 +9,8 @@
 #define base_off (Elf_Addr)0x0010000000000000
 
 
-#define ROOM_ENV "room_env"
-#define ROOM_ARGV "room_argv"
+#define ROOM_ENV "__loader_room_env"
+#define ROOM_ARGV "__loader_room_argv"
 
 enum e_settings {
   e_noprogname = 1,
@@ -21,6 +21,8 @@ enum e_settings {
 struct admin_s {
   int pidnum;
   int verbose;
+  //packed settings
+  unsigned long settings;
   //Elf_Addr base;
   unsigned long base;
   char *fname;
@@ -54,6 +56,7 @@ struct admin_s {
 
 #define ZERO_ADMINP(x)\
   (x)->timecallback = 0;\
+  (x)->settings = 0;\
   (x)->pidnum = 0;\
   (x)->verbose = 0;\
   (x)->base = 0;\

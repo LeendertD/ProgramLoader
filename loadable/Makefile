@@ -1,4 +1,4 @@
-all: tinyex spawny printy fourtwo
+all: tinyex spawny printy fourtwo sparmy
 
 CRT=crt_fun.o argroom.o envroom.o
 
@@ -13,14 +13,15 @@ clean:
 	$(CLEANONE) spawny
 	$(CLEANONE) printy
 	$(CLEANONE) fourtwo
+	$(CLEANONE) sparmy
 
 crt_fun.o: crt_fun.c
 	$(CC) $(CFLAGS) -c $<
 
-argroom.o: argroom.s
+argroom.o: argroom.c
 	$(CC) $(CFLAGS) -c $<
 
-envroom.o: envroom.s
+envroom.o: envroom.c
 	$(CC) $(CFLAGS) -c $<
 
 NA=tinyex
@@ -36,3 +37,9 @@ $(NC): $(NC).c $(CRT)
 ND=fourtwo
 $(ND): $(ND).c $(CRT)
 	$(MK) $@
+
+NE=sparmy
+$(NE): $(NE).c $(CRT)
+	$(MK) $@
+
+

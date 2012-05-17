@@ -49,12 +49,5 @@ int elf_loadfile_p(struct admin_s *, enum e_settings);
 void locked_delbase(int deadpid);
 Elf_Addr locked_newbase(struct admin_s **params);
 
-
-#define Verify(Expr, Message)                                  \
-  if (!(Expr)) {                                               \
-    fprintf(stderr, "Verification failure: %s\n", (Message) ); \
-    svp_abort();                                                   \
-  }
-
 #endif
 

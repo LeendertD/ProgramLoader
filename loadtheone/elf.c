@@ -78,15 +78,14 @@ void locked_delbase(int deadpid){
   if (proctable[deadpid].timecallback) proctable[deadpid].timecallback();
 
 #if ENABLE_DEBUG
-  if (1||(proctable[deadpid].verbose > VERB_INFO)){
+  if ((proctable[deadpid].settings & e_timeit) || (proctable[deadpid].verbose > VERB_INFO)){
     char buff[1024];
-    snprintf(buff, 1023, "Clocks: %d start @%lu: c2d:%lu, c2l:%lu, c2c:%lu ...%d\n",
+    snprintf(buff, 1023, "\n<Clocks>%d start @%lu: c2d:%lu, c2l:%lu, c2c:%lu</Clocks>\n",
         deadpid,
       proctable[deadpid].createtick,
       proctable[deadpid].detachtick - proctable[deadpid].createtick,
       proctable[deadpid].lasttick - proctable[deadpid].createtick,
-      proctable[deadpid].cleaneduptick - proctable[deadpid].createtick,
-      proctable[deadpid].verbose 
+      proctable[deadpid].cleaneduptick - proctable[deadpid].createtick
       );
     locked_print_string(buff, PRINTERR);
   }
@@ -94,8 +93,11 @@ void locked_delbase(int deadpid){
 #endif
   //clockcalls
 #endif
-  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
-  sl_sync();
+
+
+  //DEALLOC MEMRANGES FIRST OR BOOM
+  //sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
+  //sl_sync();
 }
 
 #define SANE_SIZE sizeof(struct Elf_Ehdr)
@@ -213,8 +215,12 @@ int elf_loadfile(const char *fname, enum e_settings flags,
 int elf_header_marshall(char *dstart, size_t size){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
 
-  Verify(size >= sizeof(struct Elf_Ehdr),
-      "ELF file too short or truncated");
+  if (size < sizeof(struct Elf_Ehdr)){
+#if ENABLE_DEBUG
+    locked_print_string("ELF file too short or truncated", PRINTERR);
+#endif
+    return -1;
+  }
   // Unmarshall header
   ehdr->e_type      = elftohh(ehdr->e_type);
   ehdr->e_machine   = elftohh(ehdr->e_machine);
@@ -363,10 +369,14 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
   // Then copy the LOAD segments into their right locations
   for (i=0; i < ehdr->e_phnum; ++i){
     if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0){
-      Verify(phdr[i].p_memsz >= phdr[i].p_filesz,
-          "file has an invalid segment");
-      char *act_addr;
-            
+      if (phdr[i].p_memsz < phdr[i].p_filesz){
+#if ENABLE_DEBUG
+        if (verbose > VERB_ERR) {
+          locked_print_string("file has an invalid segment, wont fit into memory", PRINTERR);
+        }
+#endif
+        return -1;
+      }
       int perm = 0;
       if (phdr[i].p_flags & PF_R) perm |= perm_read;
       //perm |= IMemory::PERM_READ|IMemory::PERM_DCA_READ;
@@ -375,63 +385,55 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
       if (phdr[i].p_flags & PF_X) perm |= perm_exec;
       //IMemory::PERM_EXECUTE;
             
-      act_addr = ((char*)base) + phdr[i].p_vaddr;
-      if (phdr[i].p_filesz > 0){
-        //Segment containing payload
-        Verify(phdr[i].p_offset + phdr[i].p_filesz <= size,
-            "file has an invalid segment");
+      char *act_addr = ((char*)base) + phdr[i].p_vaddr;
 
+      if ((phdr[i].p_offset + phdr[i].p_filesz) > size){
 #if ENABLE_DEBUG
-        if (verbose >VERB_INFO) {
-          char buff[1024];
-          snprintf(buff, 1023,
-              "load F: %d_%d: size %p,%p @ %p with %d\n",
-              phdr[i].p_type, i, (void*)phdr[i].p_memsz,
-              (void*)phdr[i].p_filesz, act_addr, perm);
-          locked_print_string(buff, PRINTERR);
+        if (verbose > VERB_ERR) {
+          locked_print_string("file has an invalid segment: data incomplete", PRINTERR);
         }
 #endif
-        //reserve, prepare data
-#ifndef FLAG_NONEEDODDPERMS
-        reserve_range(act_addr, phdr[i].p_memsz, perm |
-            perm_read|perm_write|perm_exec
-            );
-#else
-        reserve_range(act_addr, phdr[i].p_memsz, perm);
-#endif
-        memcpy(act_addr, dstart + phdr[i].p_offset, phdr[i].p_filesz);
-        if (phdr[i].p_filesz < phdr[i].p_memsz){
-          //beyond the supplied data, 0 as per spec
-          memset(act_addr + phdr[i].p_filesz, 0, phdr[i].p_memsz - phdr[i].p_filesz-1);
-        }
-
-#if ENABLE_DEBUG
-        if (verbose > VERB_TRACE){
-          char buff[1024];
-          snprintf(buff, 1023,"Loader %p bytes loaded at %p\n",(void*) phdr[i].p_filesz,(void*) act_addr);
-          locked_print_string(buff, PRINTERR);
-        }
-#endif
-      } else {
-        /* If the name equals a 'magic' name, remember the address for usage for
-         * things like argv, env. Or anything yet to be invented.
-         **/
-#if ENABLE_DEBUG
-        if (verbose > VERB_TRACE) {
-          snprintf(buff, 1023, "load U: %d: 0X%x size %p,%p @ %p\n with %d", phdr[i].p_type, i,
-          (void*)phdr[i].p_memsz, (void*)phdr[i].p_filesz, act_addr, perm);
-          locked_print_string(buff, PRINTERR);
-        }
-#endif
-        //segment that needs reservation
-        reserve_range((void*)act_addr, phdr[i].p_memsz, perm);
-#if ENABLE_DEBUG
-        if (verbose > VERB_TRACE){
-          snprintf(buff, 1023, "Loader reserved %p bytes at %p\n",(void*) phdr[i].p_memsz,(void*) act_addr);
-          locked_print_string(buff, PRINTERR);
-        }
-#endif
+        return -1;
       }
+
+#if ENABLE_DEBUG
+      if (verbose >VERB_TRACE) {
+        char buff[1024];
+        snprintf(buff, 1023,
+            "load : %d_%d: size %p,%p @ %p with %d\n",
+            phdr[i].p_type, i, (void*)phdr[i].p_memsz,
+            (void*)phdr[i].p_filesz, act_addr, perm);
+        locked_print_string(buff, PRINTERR);
+      }
+#endif
+      //reserve, prepare data
+      reserve_range(act_addr, phdr[i].p_memsz, perm |
+          perm_read|perm_write|perm_exec
+          );
+      //Permissions are currently ALL, due to setting the contents, and the
+      //backing code is not quite permission friendly yet...
+      
+      //If there is at least some data, copy it
+      if (phdr[i].p_filesz){
+        memcpy(act_addr, dstart + phdr[i].p_offset, phdr[i].p_filesz);
+      }
+
+      //If there is no data but room reserved (per spec: p_filesz < p_memsz
+      //which is even valid for no file data at all)
+      Elf_Addr deltasize = phdr[i].p_memsz - phdr[i].p_filesz;
+      if (phdr[i].p_filesz < phdr[i].p_memsz){
+        //beyond the supplied data, 0 as per spec
+        memset(act_addr + phdr[i].p_filesz, 0, deltasize);
+      }
+
+#if ENABLE_DEBUG
+      if (verbose > VERB_TRACE){
+        char buff[1024];
+        snprintf(buff, 1023,"Loader %p bytes loaded at %p, of which %p void\n",
+              (void*) phdr[i].p_filesz,(void*) act_addr, (void*)deltasize);
+        locked_print_string(buff, PRINTERR);
+      }
+#endif
     }
   }
 #if ENABLE_DEBUG
@@ -593,17 +595,19 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
 #endif
           }
 #if ENABLE_DEBUG
-          snprintf(buff, 1023, "Sym %3d: %15s(%d) %17p of size %5lu, %3d<%2d,%2d> %3d, %8d\n", c,
-              name,
-              symt->st_name,
-              (void*)symt->st_value,
-              symt->st_size,
-              symt->st_info,
-              bind,type,
-              symt->st_other,
-              symt->st_shndx
-              );
-          locked_print_string(buff, PRINTERR);
+            if (verbose > VERB_TRACE){
+            snprintf(buff, 1023, "Sym %3d: %15s(%d) %17p of size %5lu, %3d<%2d,%2d> %3d, %8d\n", c,
+                name,
+                symt->st_name,
+                (void*)symt->st_value,
+                symt->st_size,
+                symt->st_info,
+                bind,type,
+                symt->st_other,
+                symt->st_shndx
+                );
+            locked_print_string(buff, PRINTERR);
+          }
 #endif
           c++;
           r += s->sh_entsize;
@@ -643,23 +647,30 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       Elf_Addr off = 0;
       Elf_Sxword addend = 0;
       Elf_Addr info = 0;
+      Elf_Addr * vicloc = 0;
+      
       if (SECTION_RELA == s->sh_type){
         struct Elf_Rela *rela = (struct Elf_Rela*)(dstart + s->sh_offset + r);
         off = rela->r_offset;
         info = rela->r_info;
+        //Determine the location of the relocating pointer
+        vicloc = (Elf_Addr*) (adminstart->base + off);
+        //The rela has an explicit addend
         addend = rela->r_addend;
       } else if (SECTION_REL == s->sh_type){
         struct Elf_Rel *rel = (struct Elf_Rel*)(dstart + s->sh_offset + r);
         off = rel->r_offset;
         info = rel->r_info;
+        //Determine the location of the relocating pointer
+        vicloc = (Elf_Addr*) (adminstart->base + off);
+        //The rel has the addend on the targeted location
+        addend = *vicloc;
       } else {
         continue;
       }
       int rtype = ELF_REL_TYPE(info);
       int rsym = ELF_REL_SYM(info);
 
-      //Determine the location of the relocating pointer
-      Elf_Addr * vicloc = (Elf_Addr*) (adminstart->base + off);
       //The new pointee,calculated just below
       Elf_Addr newval = 0;
 
@@ -770,13 +781,14 @@ int argsizecheck(int argc, char** argv,char * envp, Elf_Addr asize, Elf_Addr esi
 }
 
 int argsave(struct admin_s *ab,int argc, char** argv,char * envp){
-  char **acpp = (char **)ab->argroom_offset;
-  char *cpnt = (char*) (ab->argroom_offset + (sizeof(char*) *(argc + 1)));
-  ab->argc = argc;
-  ab->argv = acpp;
   //Argv
-  if (ab->argroom_size){
+  if (ab->argroom_size && argv){
     int i=0;
+    char **acpp = (char **)ab->argroom_offset;
+    char *cpnt = (char*) (ab->argroom_offset + (sizeof(char*) *(argc + 1)));
+
+    ab->argc = argc;
+    ab->argv = acpp;
     for (i=0;i<argc;i++){
       int k;
       acpp[i] = cpnt;//Argv
@@ -796,7 +808,8 @@ int argsave(struct admin_s *ab,int argc, char** argv,char * envp){
     cpnt++;
   }
 
-  if (ab->envroom_size){
+  if (ab->envroom_size && envp){
+    char *cpnt;
     int i = 0;
     ab->envp = (char*)ab->envroom_offset;
     cpnt = ab->envp;
@@ -871,6 +884,7 @@ int elf_loadprogram_p(char *data, size_t size,
   p->core_start = params->core_start;
   p->core_size = params->core_size;
   p->verbose = params->verbose;
+  p->settings = params->settings;
 
   p->base += relbase;//correct for elf base
   //force Allignment
@@ -905,13 +919,26 @@ int elf_loadprogram_p(char *data, size_t size,
   p->argv = NULL;
   p->envp = NULL;
   
-  if (argsizecheck(params->argc, params->argv, params->envp, p->envroom_size, p->argroom_size,  verbose)){
+  int sizechecks = argsizecheck(params->argc, params->argv, params->envp, p->argroom_size, p->envroom_size,  verbose);
+  if (sizechecks & 1){//Argroom NO
 #if ENABLE_DEBUG
     if (verbose > VERB_ERR) {
       locked_print_string("Arguments while not enough room available\n", PRINTERR);
     }
 #endif
-  } else {
+    params->argc = 0;
+    params->argv = NULL;
+  }
+  if (sizechecks & 2){//Envroom NO
+#if ENABLE_DEBUG
+    if (verbose > VERB_ERR) {
+      locked_print_string("Environment while not enough room available\n", PRINTERR);
+    }
+#endif
+    params->argc = 0;
+    params->argv = NULL;
+  }
+  if (params->argv || params->envp){
     if (argsave(p,
                 params->argc,
                 params->argv,

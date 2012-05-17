@@ -40,19 +40,26 @@ size_t bytes_from_bits(size_t bits){
 static const size_t minpagebytes = (size_t)1 << minpagebits; 
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
 
-int reserve_single(void *addr, size_t sz_bits){
+int reserve_param_single(void *addr, size_t sz_bits, int param){
   /**
    * Reserve a single page.
    * Returns an indication of success.
    * */
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
-    mgsim_control(addr, MGSCTL_TYPE_MEM, MGSCTL_MEM_MAP, sz_bits - minpagebits);
+    mgsim_control(addr, MGSCTL_TYPE_MEM, param , sz_bits - minpagebits);
     return 0;
   }
   return -1;
 }
+int reserve_single(void *addr, size_t sz_bits){
+  return reserve_param_single(addr,sz_bits, MGSCTL_MEM_MAP);
+}
+int reserve_cancel_single(void *addr, size_t sz_bits){
+  return reserve_param_single(addr,sz_bits, MGSCTL_MEM_UNMAP);
+}
 
-void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
+
+void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param){
   /**
    * Reserve a range of bytes, try to obtain at least perm permissions.
    * Returns a pointer to the actual end of the range.
@@ -75,12 +82,12 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
 
   if ((bytes >= minpagebytes ) && (bytes <= maxpagebytes)){
     //If a single page is ok, use it.
-    if (reserve_single(addr, sz_bits)) return 0;
+    if (reserve_param_single(addr, sz_bits, param)) return 0;
     return addr + (1 << sz_bits);
   }
   pages = bytes / maxpagebytes;
   for (i=0;i<pages;i++){
-    if (reserve_single(addr, maxpagebits)) return addr + resc;
+    if (reserve_param_single(addr, maxpagebits, param)) return addr + resc;
 
     addr += maxpagebytes;
     resc += maxpagebytes;
@@ -94,7 +101,7 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
       sz_bits++;
     }
     if (sz_bits < minpagebits) sz_bits = minpagebits;
-    if (reserve_single(addr, sz_bits)) return 0;
+    if (reserve_param_single(addr, sz_bits, param)) return 0;
     resc += 1 << sz_bits;
   }
 
@@ -102,6 +109,14 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
   //mprotect(startaddr, bytes, PROT_NONE);
   return addr + resc;
 }
+void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
+  return reserve_param_range(addr,bytes, perm, MGSCTL_MEM_MAP);
+}
+void* reserve_cancel_range(void *addr, size_t bytes, enum e_perms perm){
+  return reserve_param_range(addr,bytes, perm, MGSCTL_MEM_UNMAP);
+}
+
+
 
 /* This is the skeleton which boots a new program */
 sl_def(thread_function,,
