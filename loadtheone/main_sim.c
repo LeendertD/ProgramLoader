@@ -1,3 +1,15 @@
+/**
+ * \file main_sim.c
+ * \brief File housing bootstrap code.
+ *  Leendert van Duijn
+ *  UvA
+ *
+ *  Functions used in support of loading programs.
+ *
+ * Composit functions.
+ *
+ **/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>

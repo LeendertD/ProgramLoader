@@ -1,3 +1,15 @@
+/**
+ * \file elf.c
+ * \brief File housing loader elf specific functions.
+ *  Leendert van Duijn
+ *  UvA
+ *
+ *  Functions used in support of loading programs.
+ *
+ * Basic and composit functions.
+ *
+ **/
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -97,6 +109,7 @@ void locked_delbase(int deadpid){
 
   //DEALLOC MEMRANGES FIRST OR BOOM
   //sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
+  //sl_detach(); // At this point SYNC would be blocking while not needed
   //sl_sync();
 }
 

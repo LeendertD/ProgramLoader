@@ -1,4 +1,6 @@
 /**
+ * \file basfunc.c
+ * \brief File housing basic shared functions.
  *  Leendert van Duijn
  *  UvA
  *
@@ -27,10 +29,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+/**
+ * \var PRINTCORE core used for print calls.
+ * \brief A core used for blocking print requests
+ * do not use this core for other threads
+ */
 #define PRINTCORE 2
 
-
-//This is equal to 1 << bits ....?
+/**
+ * \brief Size in bytes from address width.
+ *  \param bits The address width.
+ *  \return the size in bytes.
+ */
 size_t bytes_from_bits(size_t bits){
   return 1l << bits;
 }
@@ -40,25 +50,48 @@ size_t bytes_from_bits(size_t bits){
 static const size_t minpagebytes = (size_t)1 << minpagebits; 
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
 
+/** \brief Do action param on a single page.
+ * Reserve a single page.
+ * Returns an indication of success.
+ * \param addr The starting address.
+ * \param sz_bits the page address width.
+ * \param param Which action to do MGSCTL_MEM_MAP for example.
+ * \return 0 on success, -1 on invalid parameters
+ * */
 int reserve_param_single(void *addr, size_t sz_bits, int param){
-  /**
-   * Reserve a single page.
-   * Returns an indication of success.
-   * */
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
     mgsim_control(addr, MGSCTL_TYPE_MEM, param , sz_bits - minpagebits);
     return 0;
   }
   return -1;
 }
+
+/** \brief Reserve a single page.
+ * \param addr the starting address.
+ * \param sz_bits the wanted page width
+ * \return 0 on success.
+ */
 int reserve_single(void *addr, size_t sz_bits){
   return reserve_param_single(addr,sz_bits, MGSCTL_MEM_MAP);
 }
+
+/** \brief Remove a mapping for a single page
+ * \param addr the starting address.
+ * \param sz_bits the page width.
+ * \return 0 on success.
+ */
 int reserve_cancel_single(void *addr, size_t sz_bits){
   return reserve_param_single(addr,sz_bits, MGSCTL_MEM_UNMAP);
 }
 
-
+/** \brief Do action param on a range of memory.
+ * \param addr the starting address.
+ * \param bytes the requested size.
+ * \param perm the requested permissions.
+ * \param param what action to do.
+ * \return pointer to the end of the actual range.
+ * The return value may be higher than addr+size due to page size limitations.
+ */
 void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param){
   /**
    * Reserve a range of bytes, try to obtain at least perm permissions.
@@ -105,20 +138,41 @@ void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param)
     resc += 1 << sz_bits;
   }
 
-  //What protection is wanted is told in perms, however, setting these...
+  /**What protection is wanted is told in perms, however, setting these... TODO*/
   //mprotect(startaddr, bytes, PROT_NONE);
   return addr + resc;
 }
+
+/** \brief Reserve a range of memory.
+ * \param addr the starting address.
+ * \param bytes the requested size.
+ * \param perm the requested permissions.
+ * \return pointer to the end of the actual range.
+ *
+ * The return value may be higher than addr+size due to page size limitations.
+ */
 void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
   return reserve_param_range(addr,bytes, perm, MGSCTL_MEM_MAP);
 }
+
+/** \brief Reserve a range of memory.
+ * \param addr the starting address.
+ * \param bytes the requested size.
+ * \param e_perms the requested permissions.
+ * \return pointer to the end of the actual range.
+ * The return value may be higher than addr+size due to page size limitations.
+ */
 void* reserve_cancel_range(void *addr, size_t bytes, enum e_perms perm){
   return reserve_param_range(addr,bytes, perm, MGSCTL_MEM_UNMAP);
 }
 
 
 
-/* This is the skeleton which boots a new program */
+/** \brief This is the skeleton which boots a new program.
+ *  \param f the called main function.
+ *  \param params the administration block used for settings and such.
+ *  \return nothing.
+ */
 sl_def(thread_function,,
                sl_glparm(main_function_t* , f),
                sl_glparm(struct admin_s *, params)
@@ -138,7 +192,7 @@ sl_def(thread_function,,
 #endif
   
   if (exit_code != 0){
-    /* Some feedback about termination */
+    /** \brief Could print some feedback about termination */
 #if ENABLE_DEBUG
     if (params->verbose > VERB_ERR){
       char buff[1024];
@@ -159,6 +213,12 @@ sl_def(thread_function,,
 }
 sl_enddef
 
+/**
+ * \brief Spawns so that main_f gets called and cleaned up afterwards.
+ * \param main_f The called function.
+ * \param params The programs administrative data.
+ * \return 0 on success.
+ */
 int function_spawn(main_function_t * main_f,
                     struct admin_s *params){
   // Placeholder for function argument determination
@@ -187,7 +247,7 @@ int function_spawn(main_function_t * main_f,
   //sl_spawnsync(f);
 
 
-  /*Create, run PROFIT*/
+  /** \brief Create, run PROFIT*/
   // optie 3 (asynchroon, nooit gesynchroniseerd)
   
   char buff[1024];
@@ -227,11 +287,24 @@ int function_spawn(main_function_t * main_f,
 }
 
 
-//This does not suply nice flags
+/**
+ * \brief spawn a program based on filename and arguments.
+ * \param programma the elf file.
+ * \param argc passed argc
+ * \param argv an string pointer array, strings get copied.
+ * \param env double null terminated string table, gets copied.
+ * \return 0 on success.
+ */
 int loader_spawn(const char *programma, int argc, char **argv, char *env) {
   return elf_loadfile(programma, 0, argc ,argv, env);
 }
 
+/**
+ * \brief Prints a string, blocking until done, no more that 1 at a time.
+ * \param strp the string.
+ * \param fd the output stream PRINTERR or PRINTOUT
+ * \return nothing
+ */
 sl_def(slprintstr_fn,, sl_glparm(const char*, strp), sl_glparm(int, fd)){
   const char *val = sl_getp(strp);
   int fdd = sl_getp(fd);
@@ -239,11 +312,23 @@ sl_def(slprintstr_fn,, sl_glparm(const char*, strp), sl_glparm(int, fd)){
 }
 sl_enddef
 
+/**
+ * \brief Prints a string, blocking until done, no more that 1 at a time.
+ * \param strp the string.
+ * \param fd the output stream PRINTERR or PRINTOUT
+ * \return nothing
+ */
 void locked_print_string(const char *stin, int fp){
   sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintstr_fn, sl_glarg(const char *, strp, stin), sl_glarg(int , fd, fp) );
   sl_sync();
 }
 
+/**
+ * \brief Prints a pointer (0x????????), blocking until done, no more that 1 at a time.
+ * \param pl the printed value.
+ * \param fd the output stream PRINTERR or PRINTOUT
+ * \return nothing
+ */
 void locked_print_pointer(void* pl, int fp){
   char buff[128];
   buff[0] = 0;
@@ -253,19 +338,36 @@ void locked_print_pointer(void* pl, int fp){
 }
 
 
-
-sl_def(slprintint_fn,, sl_glparm(int, strp), sl_glparm(int, fd)){
-  int val = sl_getp(strp);
+/**
+ * \brief Prints a number, blocking until done, no more that 1 at a time.
+ * \param pl the printed value.
+ * \param fd the output stream PRINTERR or PRINTOUT
+ * \return nothing
+ */
+sl_def(slprintint_fn,, sl_glparm(int, pl), sl_glparm(int, fd)){
+  int val = sl_getp(pl);
   int fdd = sl_getp(fd);
   output_int(val, fdd);
 }
 sl_enddef
 
+/**
+ * \brief Prints a number, blocking until done, no more that 1 at a time.
+ * \param val the printed value.
+ * \param fd the output stream PRINTERR or PRINTOUT
+ * \return nothing
+ */
 void locked_print_int(int val, int fp){
-  sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintint_fn, sl_glarg(int, strp, val), sl_glarg(int , fd, fp) );
+  sl_create(, MAKE_CLUSTER_ADDR(PRINTCORE, 1) ,,,,, sl__exclusive, slprintint_fn, sl_glarg(int, pl, val), sl_glarg(int , fd, fp) );
   sl_sync();
 }
 
+/**
+ * \brief Checks equality of strings.
+ * \param a string 'a'
+ * \param b string 'b'
+ * \return boolean true on |a| == |b| for N in 0:|a| && a[N] == b[N]
+ */
 int streq(const char *a, const char *b){
   /* No dependency needed for simple comparison */
   int i=0;

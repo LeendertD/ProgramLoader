@@ -1,3 +1,15 @@
+/**
+ * \file loader.c
+ * \brief File housing loader non elf functions.
+ *  Leendert van Duijn
+ *  UvA
+ *
+ *  Functions used in support of loading programs.
+ *
+ * Basic and composit functions.
+ *
+ **/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>

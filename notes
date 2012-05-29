@@ -29,3 +29,10 @@ mtalpha-linux-gnu-objdump -R ../loadable/tinyex|less -S
 
 
 /shell?
+
+Is it possible for each thread (with a private address space) to access the single MMU
+without technical problems other than the MMU and network being overloaded and the
+TLB being way too small, so that it would need a terribly lot of DDR accesses to
+even resolve the most common addresses
+
+COW nullpages on memset for loading
