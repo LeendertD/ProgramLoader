@@ -29,12 +29,21 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "extrafuns.h"
+
 /**
  * \var PRINTCORE core used for print calls.
  * \brief A core used for blocking print requests
  * do not use this core for other threads
  */
 #define PRINTCORE 2
+
+/**
+ * \var MEMCORE core used for race condition memory calls.
+ * do not use this core for other threads
+ */
+#define MEMCORE 3
+
 
 /**
  * \brief Size in bytes from address width.
@@ -55,24 +64,29 @@ static const size_t maxpagebytes = (size_t)1 << maxpagebits;
  * Returns an indication of success.
  * \param addr The starting address.
  * \param sz_bits the page address width.
- * \param param Which action to do MGSCTL_MEM_MAP for example.
+ * \param pid Which action to do MGSCTL_MEM_MAP for example.
  * \return 0 on success, -1 on invalid parameters
  * */
-int reserve_param_single(void *addr, size_t sz_bits, int param){
+sl_def(lockme_reserve_single,, sl_glparm(void*, addr),sl_glparm(size_t, sz_bits), sl_glparm(long, pid) ){
+  void *addr = sl_getp(addr);
+  size_t sz_bits = sl_getp(sz_bits);
+  long pid = sl_getp(pid);
+  DOPID(pid);
+  MAPONPID(addr, sz_bits-minpagebits);
+}
+sl_enddef
+
+
+int reserve_single(void *addr, size_t sz_bits, long pid){
+
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
-    mgsim_control(addr, MGSCTL_TYPE_MEM, param , sz_bits - minpagebits);
+    sl_create(, MAKE_CLUSTER_ADDR(MEMCORE, 1) ,,,,, sl__exclusive, lockme_reserve_single, sl_glarg(void*, addr,addr),
+                                                                                  sl_glarg(size_t,sz_bits,sz_bits),
+                                                                                  sl_glarg(long, pid,pid) );
+    sl_sync();
     return 0;
   }
   return -1;
-}
-
-/** \brief Reserve a single page.
- * \param addr the starting address.
- * \param sz_bits the wanted page width
- * \return 0 on success.
- */
-int reserve_single(void *addr, size_t sz_bits){
-  return reserve_param_single(addr,sz_bits, MGSCTL_MEM_MAP);
 }
 
 /** \brief Remove a mapping for a single page
@@ -80,19 +94,19 @@ int reserve_single(void *addr, size_t sz_bits){
  * \param sz_bits the page width.
  * \return 0 on success.
  */
-int reserve_cancel_single(void *addr, size_t sz_bits){
-  return reserve_param_single(addr,sz_bits, MGSCTL_MEM_UNMAP);
+int reserve_cancel_pid(long pid){
+  UNMAPONPID(pid);
+  return 0;
 }
-
 /** \brief Do action param on a range of memory.
  * \param addr the starting address.
  * \param bytes the requested size.
  * \param perm the requested permissions.
- * \param param what action to do.
+ * \param pid what pid it belongs to.
  * \return pointer to the end of the actual range.
  * The return value may be higher than addr+size due to page size limitations.
  */
-void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param){
+void* reserve_range(void *addr, size_t bytes, enum e_perms perm, long pid){
   /**
    * Reserve a range of bytes, try to obtain at least perm permissions.
    * Returns a pointer to the actual end of the range.
@@ -115,12 +129,12 @@ void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param)
 
   if ((bytes >= minpagebytes ) && (bytes <= maxpagebytes)){
     //If a single page is ok, use it.
-    if (reserve_param_single(addr, sz_bits, param)) return 0;
+    if (reserve_single(addr, sz_bits, pid)) return 0;
     return addr + (1 << sz_bits);
   }
   pages = bytes / maxpagebytes;
   for (i=0;i<pages;i++){
-    if (reserve_param_single(addr, maxpagebits, param)) return addr + resc;
+    if (reserve_single(addr, maxpagebits, pid)) return addr + resc;
 
     addr += maxpagebytes;
     resc += maxpagebytes;
@@ -134,7 +148,7 @@ void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param)
       sz_bits++;
     }
     if (sz_bits < minpagebits) sz_bits = minpagebits;
-    if (reserve_param_single(addr, sz_bits, param)) return 0;
+    if (reserve_single(addr, sz_bits, pid)) return 0;
     resc += 1 << sz_bits;
   }
 
@@ -142,31 +156,6 @@ void* reserve_param_range(void *addr, size_t bytes, enum e_perms perm,int param)
   //mprotect(startaddr, bytes, PROT_NONE);
   return addr + resc;
 }
-
-/** \brief Reserve a range of memory.
- * \param addr the starting address.
- * \param bytes the requested size.
- * \param perm the requested permissions.
- * \return pointer to the end of the actual range.
- *
- * The return value may be higher than addr+size due to page size limitations.
- */
-void* reserve_range(void *addr, size_t bytes, enum e_perms perm){
-  return reserve_param_range(addr,bytes, perm, MGSCTL_MEM_MAP);
-}
-
-/** \brief Reserve a range of memory.
- * \param addr the starting address.
- * \param bytes the requested size.
- * \param e_perms the requested permissions.
- * \return pointer to the end of the actual range.
- * The return value may be higher than addr+size due to page size limitations.
- */
-void* reserve_cancel_range(void *addr, size_t bytes, enum e_perms perm){
-  return reserve_param_range(addr,bytes, perm, MGSCTL_MEM_UNMAP);
-}
-
-
 
 /** \brief This is the skeleton which boots a new program.
  *  \param f the called main function.

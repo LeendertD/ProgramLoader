@@ -108,8 +108,9 @@ void locked_delbase(int deadpid){
 
 
   //DEALLOC MEMRANGES FIRST OR BOOM
-  //sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
-  //sl_detach(); // At this point SYNC would be blocking while not needed
+  reserve_cancel_pid(deadpid);
+  sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
+  sl_detach(); // At this point SYNC would be blocking while not needed
   //sl_sync();
 }
 
@@ -369,6 +370,7 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
   Elf_Addr base = adminstart->base;
   int verbose = adminstart->verbose;
   Elf_Half i;
+  long pid = adminstart->pidnum;
   char buff[1024];
 #if ENABLE_DEBUG
   if (verbose > VERB_INFO) {
@@ -421,7 +423,8 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
 #endif
       //reserve, prepare data
       reserve_range(act_addr, phdr[i].p_memsz, perm |
-          perm_read|perm_write|perm_exec
+          perm_read|perm_write|perm_exec,
+          pid
           );
       //Permissions are currently ALL, due to setting the contents, and the
       //backing code is not quite permission friendly yet...

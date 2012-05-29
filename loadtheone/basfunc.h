@@ -19,7 +19,9 @@ enum e_perms {
 };
 
 /** \return end of reserved range */
-void* reserve_range(void *start, size_t size, enum e_perms);
+void* reserve_range(void *start, size_t size, enum e_perms, long pid);
+int reserve_cancel_pid(long pid);
+
 //void patcher_zero(char *start, size_t size);
 //void patcher_patch(char *start, size_t count, char *src, size_t len);
 //
