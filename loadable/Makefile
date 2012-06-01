@@ -1,4 +1,4 @@
-all: tinyex spawny printy fourtwo sparmy
+all: tinyex spawny printy fourtwo sparmy null sec
 
 CRT=crt_fun.o argroom.o envroom.o
 
@@ -14,6 +14,8 @@ clean:
 	$(CLEANONE) printy
 	$(CLEANONE) fourtwo
 	$(CLEANONE) sparmy
+	$(CLEANONE) null
+	$(CLEANONE) sec
 
 crt_fun.o: crt_fun.c
 	$(CC) $(CFLAGS) -c $<
@@ -42,4 +44,11 @@ NE=sparmy
 $(NE): $(NE).c $(CRT)
 	$(MK) $@
 
+Nf=null
+$(Nf): $(Nf).c $(CRT)
+	$(MK) $@
 
+
+Ng=sec
+$(Ng): $(Ng).c $(CRT)
+	$(MK) $@

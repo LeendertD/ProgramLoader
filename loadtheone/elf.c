@@ -51,7 +51,7 @@ sl_def(slbase_fn,, sl_glparm(struct admin_s**, basep)){
   int npid = nextfreepid;
   struct admin_s **val = sl_getp(basep);
   *val = &proctable[npid];
-  (*val)->base = npid * base_off;
+  (*val)->base = base_off + npid * base_progmaxsize;
   (*val)->pidnum = npid;
   
   nextfreepid = (*val)->nextfreepid;
@@ -92,8 +92,11 @@ void locked_delbase(int deadpid){
 #if ENABLE_DEBUG
   if ((proctable[deadpid].settings & e_timeit) || (proctable[deadpid].verbose > VERB_INFO)){
     char buff[1024];
-    snprintf(buff, 1023, "\n<Clocks>%d start @%lu: c2d:%lu, c2l:%lu, c2c:%lu</Clocks>\n",
+    snprintf(buff, 1023, "\n<Clocks>%d on %d(%d) start @%lu: c2d:%lu, c2l:%lu, c2c:%lu</Clocks>\n",
         deadpid,
+        proctable[deadpid].core_start,
+        proctable[deadpid].core_size,
+
       proctable[deadpid].createtick,
       proctable[deadpid].detachtick - proctable[deadpid].createtick,
       proctable[deadpid].lasttick - proctable[deadpid].createtick,

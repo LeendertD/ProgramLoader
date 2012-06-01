@@ -6,7 +6,8 @@
 
 #define PRINTERR 2
 #define PRINTOUT 1
-#define base_off (Elf_Addr)0x0010000000000000
+#define base_off (Elf_Addr)(1l << 50)
+#define base_progmaxsize (Elf_Addr)(1l << 50)
 
 
 #define ROOM_ENV "__loader_room_env"
