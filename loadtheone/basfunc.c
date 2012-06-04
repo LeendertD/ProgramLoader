@@ -250,21 +250,19 @@ int function_spawn(main_function_t * main_f,
 #endif
   //There are core placement specs
   int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
+  cad = (params->core_start == -1)?0:cad;
 
-  //Could be moved beyond the create, but the thread MIGHT be running already
-  //need to check the docs
 #if ENABLE_CLOCKCALLS
   params->detachtick = clock();
 #endif
-  if (params->core_start == -1){
-    //Autocore, or actually just 'here'
-    sl_create( , , , , , , , thread_function, 
+
+  if (params->settings & e_exclusive){ 
+    sl_create( ,cad, , , , , sl__exlusive, thread_function, 
       sl_glarg(main_function_t* ,, main_f),
       sl_glarg(struct admin_s*, , params)
     );
     sl_detach();
   } else {
-
     sl_create( ,cad, , , , , , thread_function, 
       sl_glarg(main_function_t* ,, main_f),
       sl_glarg(struct admin_s*, , params)

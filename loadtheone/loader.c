@@ -61,6 +61,12 @@ int parse_setting(const char* key, const char* val,
     *settings |= e_timeit;
     return 0;
   }
+  if (streq(key, "exclusive") &&
+      streq(val, "true")){
+    *settings |= e_exclusive;
+    return 0;
+  }
+
 
   return -1;
 }

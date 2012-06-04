@@ -15,8 +15,8 @@
 
 enum e_settings {
   e_noprogname = 1,
-  e_timeit = 1 << 2
-
+  e_timeit = 1 << 2,
+  e_exclusive = 1 << 3
 };
 
 struct admin_s {
