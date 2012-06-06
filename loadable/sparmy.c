@@ -52,9 +52,20 @@ int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   int (*s)(struct admin_s *, enum e_settings);
   s = api->load_fromparam;
 
+  /*Call */
+  cld.verbose=0;
+  cld.settings = 0;
+  cld.core_start = 64;
+  cld.core_size = 1;
+  cld.argv = runargv; 
+  cld.argc = 0;
+  cld.fname = argv[1];
+  //Pass the env
+  cld.envp = env;
+  (*s)(&cld,0);
   /*Use as argument, unrelated to argv...*/
   for (i=1; i<argc; i++){
-    output_string(msgcat(argv[i]), PRINTOUT);
+ //   output_string(msgcat(argv[i]), PRINTOUT);
 
     /*Call 'things' with args as specced */
     cld.verbose=0;

@@ -90,9 +90,9 @@ void locked_delbase(int deadpid){
   if (proctable[deadpid].timecallback) proctable[deadpid].timecallback();
 
 #if ENABLE_DEBUG
-  if ((proctable[deadpid].settings & e_timeit) || (proctable[deadpid].verbose > VERB_INFO)){
+  if ((proctable[deadpid].settings & e_timeit)/* || (proctable[deadpid].verbose > VERB_INFO)*/){
     char buff[1024];
-    snprintf(buff, 1023, "\n<Clocks>%d on %d(%d) start @%lu: c2d:%lu, c2l:%lu, c2c:%lu</Clocks>\n",
+    snprintf(buff, 1023, "\n<Clocks>%d,%d,%d,%lu,%lu,%lu,%lu</Clocks>%s\n",
         deadpid,
         proctable[deadpid].core_start,
         proctable[deadpid].core_size,
@@ -100,7 +100,8 @@ void locked_delbase(int deadpid){
       proctable[deadpid].createtick,
       proctable[deadpid].detachtick - proctable[deadpid].createtick,
       proctable[deadpid].lasttick - proctable[deadpid].createtick,
-      proctable[deadpid].cleaneduptick - proctable[deadpid].createtick
+      proctable[deadpid].cleaneduptick - proctable[deadpid].createtick,
+      ""/*((proctable[deadpid].fname)?(proctable[deadpid].fname):"")*/
       );
     locked_print_string(buff, PRINTERR);
   }

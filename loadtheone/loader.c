@@ -285,6 +285,7 @@ void elf_fromconf(int fd){
   params.core_size = 1;
   //Default verbosity, nice and LOUD
   params.verbose = VERB_TRACE+1;
+  params.settings = 0;
   read_settings(fd, &params);
   read_argv(fd, &params);
   if (!params.fname) {
