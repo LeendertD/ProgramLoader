@@ -22,16 +22,16 @@ const char *strs[] = {
 };
 
 const char * a = "123456";
-int dudewheresmycard(void){
-  return 43;
-}
-int iaintfoundit(void){
-  int a;
-  a=0;
-  a=2;
-  a=dudewheresmycard();
-  return a;
-}
+//int dudewheresmycard(void){
+//  return 43;
+//}
+//int iaintfoundit(void){
+//  int a;
+//  a=0;
+//  a=2;
+//  a=dudewheresmycard();
+//  return a;
+//}
 int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   int (*s)(const char*,enum e_settings, int,char**,char*);
   void (*output_string)(const char *, int) = api->print_string;
@@ -41,7 +41,7 @@ int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   output_pointer((char*)a, PRINTOUT);
 
   //Load the breakpoint function into a 'global' variable
-  lbp = (void*)42;//api->breakpoint;
+  lbp = api->breakpoint;
   int i;
   s = api->spawn;
 
@@ -56,7 +56,9 @@ int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   //bp("Pre print env\n");
   output_int((int)(long)env, PRINTOUT);
 
+  bp("Pre loop\n");
   for (i=0;i<100000;i++) __asm__("nop");
+  bp("Post loop\n");
 
   //bp("Pre print longthing\n");
   for (i=0;strs[i];i++){

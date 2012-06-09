@@ -23,6 +23,7 @@
 #include "ELF.h"
 #include "loader.h"
 #include "basfunc.h"
+#include "extrafuns.h"
 
 int parse_setting(const char* key, const char* val,
   unsigned long *settings,
@@ -332,6 +333,7 @@ void elf_fromconfname(const char *fn){
 }
 
 enum handled_by elf_clientbreakpoint(int id, const char *msg){
+  STEP();
   (void)id;
   (void)msg;
   //locked_print_string(msg, PRINTERR);
