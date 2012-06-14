@@ -54,12 +54,24 @@ size_t bytes_from_bits(size_t bits){
   return 1l << bits;
 }
 
+
+#ifndef minpagebits
+/** Minimum bits page width*/
 #define minpagebits ((size_t)  12)
+#endif /*minpagebits*/
+
+#ifndef maxpagebits
+/** Maximum bits page width*/
 #define maxpagebits ((size_t)  19)
+#endif
+
+/** Minimum number of bytes in a page */
 static const size_t minpagebytes = (size_t)1 << minpagebits; 
+
+/** Maximum number of bytes in a page */
 static const size_t maxpagebytes = (size_t)1 << maxpagebits; 
 
-/** \brief Do action param on a single page.
+/* \brief Do action param on a single page.
  * Reserve a single page.
  * Returns an indication of success.
  * \param addr The starting address.
@@ -76,7 +88,13 @@ sl_def(lockme_reserve_single,, sl_glparm(void*, addr),sl_glparm(size_t, sz_bits)
 }
 sl_enddef
 
-
+/** 
+ * Allocate a single page.
+ * \param addr Starting address of the page.
+ * \param sz_bits The desired pade width.
+ * \param pid The owning PID.
+ * \return 0 on success
+ **/
 int reserve_single(void *addr, size_t sz_bits, long pid){
 
   if ((sz_bits >= minpagebits ) && (sz_bits <= maxpagebits)){
@@ -89,11 +107,11 @@ int reserve_single(void *addr, size_t sz_bits, long pid){
   return -1;
 }
 
-/** \brief Remove a mapping for a single page
- * \param addr the starting address.
- * \param sz_bits the page width.
+/**
+ * Cancel All owned (by pid) memory.
+ * \param pid Which owning processes memory.
  * \return 0 on success.
- */
+ * */
 int reserve_cancel_pid(long pid){
   UNMAPONPID(pid);
   return 0;
@@ -157,7 +175,7 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm, long pid){
   return addr + resc;
 }
 
-/** \brief This is the skeleton which boots a new program.
+/* \brief This is the skeleton which boots a new program.
  *  \param f the called main function.
  *  \param params the administration block used for settings and such.
  *  \return nothing.
@@ -178,7 +196,7 @@ sl_def(thread_function,,
 
 #if ENABLE_CLOCKCALLS
   params->lasttick = clock();
-#endif
+#endif /* ENABLE_CLOCKCALLS */
   
   if (exit_code != 0){
     /** \brief Could print some feedback about termination */
@@ -188,7 +206,7 @@ sl_def(thread_function,,
       snprintf(buff, 1023, "program terminated with code %d\n", exit_code);
       locked_print_string(buff, PRINTERR);
     }
-#endif
+#endif /* ENABLE_DEBUG */
   }
 
 #if ENABLE_DEBUG
@@ -197,7 +215,7 @@ sl_def(thread_function,,
       snprintf(buff, 1023, "Program with main@%p terminated with %d\n", (void*)f, exit_code);
     locked_print_string(buff, PRINTERR);
   }
-#endif
+#endif /* ENABLE_DEBUG */
   locked_delbase(params->pidnum);
 }
 sl_enddef
@@ -247,14 +265,14 @@ int function_spawn(main_function_t * main_f,
       "To cores: %d @ %d\n",params->core_size, params->core_start);
     locked_print_string(buff, PRINTERR);
   }
-#endif
+#endif /* ENABLE_DEBUG */
   //There are core placement specs
   int cad = MAKE_CLUSTER_ADDR(params->core_start,params->core_size);
   cad = (params->core_start == -1)?0:cad;
 
 #if ENABLE_CLOCKCALLS
   params->detachtick = clock();
-#endif
+#endif /* ENABLE_CLOCKCALLS */
 
   if (params->settings & e_exclusive){ 
     sl_create( ,cad, , , , , sl__exlusive, thread_function, 
@@ -286,7 +304,7 @@ int loader_spawn(const char *programma, int argc, char **argv, char *env) {
   return elf_loadfile(programma, 0, argc ,argv, env);
 }
 
-/**
+/*
  * \brief Prints a string, blocking until done, no more that 1 at a time.
  * \param strp the string.
  * \param fd the output stream PRINTERR or PRINTOUT
@@ -301,8 +319,8 @@ sl_enddef
 
 /**
  * \brief Prints a string, blocking until done, no more that 1 at a time.
- * \param strp the string.
- * \param fd the output stream PRINTERR or PRINTOUT
+ * \param stin the string.
+ * \param fp the output stream PRINTERR or PRINTOUT
  * \return nothing
  */
 void locked_print_string(const char *stin, int fp){
@@ -313,7 +331,7 @@ void locked_print_string(const char *stin, int fp){
 /**
  * \brief Prints a pointer (0x????????), blocking until done, no more that 1 at a time.
  * \param pl the printed value.
- * \param fd the output stream PRINTERR or PRINTOUT
+ * \param fp the output stream PRINTERR or PRINTOUT
  * \return nothing
  */
 void locked_print_pointer(void* pl, int fp){
@@ -325,7 +343,7 @@ void locked_print_pointer(void* pl, int fp){
 }
 
 
-/**
+/*
  * \brief Prints a number, blocking until done, no more that 1 at a time.
  * \param pl the printed value.
  * \param fd the output stream PRINTERR or PRINTOUT
@@ -341,7 +359,7 @@ sl_enddef
 /**
  * \brief Prints a number, blocking until done, no more that 1 at a time.
  * \param val the printed value.
- * \param fd the output stream PRINTERR or PRINTOUT
+ * \param fp the output stream PRINTERR or PRINTOUT
  * \return nothing
  */
 void locked_print_int(int val, int fp){

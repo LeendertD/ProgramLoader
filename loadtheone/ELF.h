@@ -2,11 +2,14 @@
 #define TYPES_H
 
 /***
+ * \file ELF.h
+ *
  *  Leendert van Duijn:
  *  Copied this file from the microgrid framework, moddified for C (no ++)
  *  usage. Some functions are needed, others could be removed. Most importantly
  *  is the usage as a local header, nothing should be exported from this.
  *
+ * \brief File used for ELF loader, do not include.
  ***/
 
 
