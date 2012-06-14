@@ -32,14 +32,14 @@
 #include "extrafuns.h"
 
 /**
- * \var PRINTCORE core used for print calls.
+ * core used for print calls.
  * \brief A core used for blocking print requests
  * do not use this core for other threads
  */
 #define PRINTCORE 2
 
 /**
- * \var MEMCORE core used for race condition memory calls.
+ * core used for race condition memory calls.
  * do not use this core for other threads
  */
 #define MEMCORE 3
