@@ -12,20 +12,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <string.h>
 #include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include <time.h>
 #include <errno.h>
+
 #include "ELF.h"
 #include "basfunc.h"
 #include "loader.h"
-#include <unistd.h>
-#include <time.h>
 
 /** Which node is used for PID/base allocation/determination */
 #define NODE_BASELOCK 3
@@ -94,6 +92,7 @@ Elf_Addr locked_newbase(struct admin_s **params){
   /** As soon as possible without blocking others, notes the 'time' */
   (*params)->createtick = clock();
 #endif /* clockcalls */
+
   return (*params)->base;
 }
 
@@ -128,7 +127,7 @@ void locked_delbase(int deadpid){
 #endif /* ENABLE_CLOCKCALLS */
 
 
-  /* DEALLOC MEMRANGES FIRST OR BOOM */
+  /* DEALLOC MEMRANGES FIRST OR THEY GO BOOM */
   reserve_cancel_pid(deadpid);
   sl_create(, MAKE_CLUSTER_ADDR(NODE_BASELOCK, 1) ,,,,, sl__exclusive, sldelbase_fn, sl_glarg(int, deadpid, deadpid));
   sl_detach();
@@ -314,7 +313,6 @@ int elf_header_marshall(char *dstart, size_t size){
 int elf_header_check(char *dstart, size_t size, int verbose){
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
 
-
   /** Checks file header (signature) **/
   if ((dstart + size) < (char*)(& ehdr->e_ident[EI_MAG3])) {
 #if ENABLE_DEBUG
@@ -328,15 +326,15 @@ int elf_header_check(char *dstart, size_t size, int verbose){
          ehdr->e_ident[EI_MAG1] == ELFMAG1 &&
          ehdr->e_ident[EI_MAG2] == ELFMAG2 &&
          ehdr->e_ident[EI_MAG3] == ELFMAG3){
+    /* Succesfull check, return */
     return 0;
   } else {
 
 #if ENABLE_DEBUG
     if (verbose > VERB_ERR) locked_print_string("invalid ELF file signature", PRINTERR);
 #endif /* ENABLE_DEBUG */
-
-    return -1;
   }
+  return -1;
 }
 
 /** \brief Checks architecture.
@@ -387,12 +385,12 @@ int elf_header_check_arch(char *dstart, size_t size, int verbose){
     return -1;
   }
 
-//#ifdef CHECK_EXECELF_ENABLETHISTOBREAKSTUFF
-// if (ehdr->e_type != ET_EXEC){
-//   locked_print_string("file is not an executable file", PRINTERR);
-//   return -1;
-// }
-//#endif
+  //#ifdef CHECK_EXECELF_ENABLETHISTOBREAKSTUFF
+  // if (ehdr->e_type != ET_EXEC){
+  //   locked_print_string("file is not an executable file", PRINTERR);
+  //   return -1;
+  // }
+  //#endif
 
   /** Checks existance of program header **/
   if (ehdr->e_phoff == 0 || ehdr->e_phnum == 0){
@@ -445,7 +443,6 @@ Elf_Addr elf_findbase_marshallphdr(char *dstart, size_t size){
 
   /* Size check not currently implemented */
   (void) size;
-
 
   /** Determine base address and check for loadable segments */
   int hasLoadable = 0;
@@ -503,11 +500,8 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
       }
       int perm = 0;
       if (phdr[i].p_flags & PF_R) perm |= perm_read;
-      //perm |= IMemory::PERM_READ|IMemory::PERM_DCA_READ;
       if (phdr[i].p_flags & PF_W) perm |= perm_write;
-      //IMemory::PERM_WRITE|IMemory::PERM_DCA_WRITE;
       if (phdr[i].p_flags & PF_X) perm |= perm_exec;
-      //IMemory::PERM_EXECUTE;
             
       char *act_addr = ((char*)base) + phdr[i].p_vaddr;
 
@@ -538,8 +532,10 @@ int elf_loadit(char *dstart, size_t size, struct admin_s* adminstart){
           perm_read|perm_write|perm_exec,
           pid
           );
-      //Permissions are currently ALL, due to setting the contents, and the
-      //backing code is not quite permission friendly yet...
+      /**
+       * Permissions are currently ALL, due to setting the contents, and the 
+       * backing code is not quite permission friendly yet...
+       * */
       
       //If there is at least some data, copy it
       if (phdr[i].p_filesz){
@@ -636,7 +632,11 @@ const char *elf_sectiontype(Elf_Addr in){
  * \return string poitner.
  **/
 const char * elf_symname(Elf_Addr base,struct Elf_Shdr* s, struct Elf_Sym* sym,struct Elf_Ehdr *ehdr){
-  const char * stringdata = (const char*) ((struct Elf_Shdr*) (base + ehdr->e_shoff + (s->sh_link * ehdr->e_shentsize)))->sh_offset + base;
+  const char * stringdata = (const char*) ((struct Elf_Shdr*) (base +
+                                                               ehdr->e_shoff +
+                                                               (s->sh_link * ehdr->e_shentsize)
+                                                              )
+                                          )->sh_offset + base;
   return stringdata + sym->st_name;
 }
 
@@ -647,7 +647,11 @@ const char * elf_symname(Elf_Addr base,struct Elf_Shdr* s, struct Elf_Sym* sym,s
  * \return String pointer
  **/
 const char *elf_sectname(Elf_Addr base, int num,struct Elf_Ehdr *ehdr){
-  const char *stringdata = (const char *)((struct Elf_Shdr*) (base + ehdr->e_shoff + (ehdr->e_shstrndx * ehdr->e_shentsize)))->sh_offset + base;
+  const char *stringdata = (const char *)((struct Elf_Shdr*) (base +
+                                                              ehdr->e_shoff +
+                                                              (ehdr->e_shstrndx * ehdr->e_shentsize)
+                                                             )
+                                         )->sh_offset + base;
   return(num + stringdata);
 }
 
@@ -661,10 +665,8 @@ const char *elf_sectname(Elf_Addr base, int num,struct Elf_Ehdr *ehdr){
 int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int verbose){
   (void)size;
   struct Elf_Ehdr *ehdr = (struct Elf_Ehdr*)dstart;
-  //Elf_Addr base = adminstart->base;
   Elf_Half sectsize = ehdr->e_shentsize;
   Elf_Half numsects = ehdr->e_shnum;
-  //Elf_Off sectoff = ehdr->e_shoff;
   Elf_Half strndx = ehdr->e_shstrndx;
   
   int relocs[1024] = {0};
@@ -683,6 +685,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
   }
 
 #if ENABLE_DEBUG
+  /*Printing verbose information, optional*/
   if (verbose > VERB_TRACE){
     snprintf(buff,1023, "Got %d sections of size %d each Expecting size %lu\n"\
                       "Stringtable in section %d\n",
@@ -701,6 +704,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
     struct Elf_Shdr *s = (struct Elf_Shdr*) (dstart + ehdr->e_shoff + (i*sectsize));
 
 #if ENABLE_DEBUG
+    /*Printing verbose information, optional*/
     if (verbose > VERB_TRACE){
       snprintf(buff,1023, "Section %3d(%8s): %15s,%6u, %14lu,%14lu,%14lu,%14lu, %6u,%6u, %14lu,%14lu\n", i,elf_sectiontype(s->sh_type),
           elf_sectname((Elf_Addr)dstart, s->sh_name, ehdr),
@@ -713,6 +717,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       case SECTION_DYNSYM:
 
 #if ENABLE_DEBUG
+        /*Printing verbose information, optional*/
         if (verbose > VERB_TRACE) locked_print_string("Setting (Dyn)symbol pointer\n", PRINTERR); 
         if (symtabind && (verbose > VERB_ERR)) locked_print_string("Error: Double symtab\n", PRINTERR);
 #endif /* ENABLE_DEBUG */
@@ -738,6 +743,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
             adminstart->envroom_size = symt->st_size;
 
 #if ENABLE_DEBUG
+            /*Printing verbose information, optional*/
             if (verbose > VERB_TRACE){
               snprintf(buff, 1023, "Envroom: %s@%p<%p>--> %p\n",name,(void*)symt->st_value, (void*)symt->st_size, (void*)adminstart->envroom_offset);
               locked_print_string(buff, PRINTERR);
@@ -750,6 +756,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
             adminstart->argroom_size = symt->st_size;
 
 #if ENABLE_DEBUG
+            /*Printing verbose information, optional*/
             if (verbose > VERB_TRACE){
               snprintf(buff, 1023, "Argroom: %s@%p<%p>--> %p\n",name,(void*)symt->st_value, (void*)symt->st_size, (void*)adminstart->argroom_offset);
               locked_print_string(buff, PRINTERR);
@@ -759,6 +766,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
           }
 
 #if ENABLE_DEBUG
+            /*Printing verbose information, optional*/
             if (verbose > VERB_TRACE){
             snprintf(buff, 1023, "Sym %3d: %15s(%d) %17p of size %5lu, %3d<%2d,%2d> %3d, %8d\n", c,
                 name,
@@ -848,6 +856,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       struct Elf_Sym *sym = (struct Elf_Sym*) (dstart + symsect->sh_offset + (rsym * symbolsize));
 
 #if ENABLE_DEBUG
+      /*Printing verbose information, optional*/
       if (verbose > VERB_TRACE){
         snprintf(buff, 1023, "Rela:: %p, (+%p), %p: %d, %d\n", (void*)off, (void*)addend, (void*)info,
                  rtype, rsym);
@@ -858,6 +867,7 @@ int elf_sectionscan(char *dstart, size_t size, struct admin_s* adminstart, int v
       newval = addend + adminstart->base  + sym->st_value;
 
 #if ENABLE_DEBUG
+      /*Printing verbose information, optional*/
       if (verbose > VERB_TRACE){
         const char * tp = "?";
         switch (rtype){
@@ -912,7 +922,7 @@ int elf_spawn(char *dstart, size_t size, struct admin_s *adminstart,
 #endif /* ENABLE_DEBUG */
 
   function_spawn((main_function_t*) ((char*)base + ehdr->e_entry),
-      adminstart);
+                 adminstart);
   return 0;
 }
 
@@ -997,8 +1007,9 @@ int argsave(struct admin_s *ab,int argc, char** argv,char * envp){
     ab->argc = argc;
     ab->argv = acpp;
     for (i=0;i<argc;i++){
+      /*For each arugment, copy it, terminate it, and move on*/
       int k;
-      acpp[i] = cpnt;//Argv
+      acpp[i] = cpnt;
       acpp[i+1] = NULL;
       *cpnt = 0;
   
@@ -1015,6 +1026,7 @@ int argsave(struct admin_s *ab,int argc, char** argv,char * envp){
     cpnt++;
   }
 
+  /*For all environment, copy and terminate*/
   if (ab->envroom_size && envp){
     char *cpnt;
     int i = 0;
@@ -1110,7 +1122,7 @@ int elf_loadprogram_p(char *data, size_t size,
 #endif /* ENABLE_DEBUG */
   
 
-  //Set transferablesettings
+  //Set transferable settings
   p->fname = params->fname;
   p->core_start = params->core_start;
   p->core_size = params->core_size;
@@ -1119,6 +1131,7 @@ int elf_loadprogram_p(char *data, size_t size,
 
   p->base += relbase;//correct for elf base
   //force Allignment
+  /** Alligment on possible page size */
   static const int PAGE_SIZE = 4096;
   p->base = p->base & -PAGE_SIZE;
   

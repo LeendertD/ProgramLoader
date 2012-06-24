@@ -1,3 +1,5 @@
+/* Simple mutex like construct test */
+
 #include <svp/testoutput.h>
 
 

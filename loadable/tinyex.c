@@ -4,12 +4,16 @@
 /*Non static storage manages to CRASH*/
 enum handled_by (*lbp)(int, const char*);
 
+/** Breakpoint, with incrementing counter.
+ * \param msg parameter
+ * */
 void bp(const char *msg){
   static int id = 0;
   (*lbp)(id, msg);
   id++;
 }
 
+/** Strings needing relocation */
 const char *strs[] = {
 "Hoi ",
 "dit ",
@@ -21,17 +25,17 @@ const char *strs[] = {
 0
 };
 
+/** Global variable */
 const char * a = "123456";
-//int dudewheresmycard(void){
-//  return 43;
-//}
-//int iaintfoundit(void){
-//  int a;
-//  a=0;
-//  a=2;
-//  a=dudewheresmycard();
-//  return a;
-//}
+
+
+/** \brief Tries to print, calls breakpoints, returns 0.
+ * \param argc nr of args, unused
+ * \param argv arguments, unused
+ * \param env Environment, unused
+ * \param api API interface, used for print,breakpoint functions
+ * \return zero
+ * */
 int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   int (*s)(const char*,enum e_settings, int,char**,char*);
   void (*output_string)(const char *, int) = api->print_string;
@@ -45,8 +49,6 @@ int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   int i;
   s = api->spawn;
 
-
-  /*Use as argument, unrelated to argv...*/
   //bp("Pre print hw\n");
   output_string("hello world\n", PRINTOUT);
   //bp("Pre print ac\n");
@@ -57,6 +59,7 @@ int lmain(int argc, char **argv, char *env, struct loader_api_s *api){
   output_int((int)(long)env, PRINTOUT);
 
   bp("Pre loop\n");
+  /** Forced 'nothing' */
   for (i=0;i<100000;i++) __asm__("nop");
   bp("Post loop\n");
 

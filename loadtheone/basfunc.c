@@ -116,6 +116,7 @@ int reserve_cancel_pid(long pid){
   UNMAPONPID(pid);
   return 0;
 }
+
 /** \brief Do action param on a range of memory.
  * \param addr the starting address.
  * \param bytes the requested size.
@@ -157,6 +158,7 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm, long pid){
     addr += maxpagebytes;
     resc += maxpagebytes;
   }
+
   i = bytes % maxpagebytes;
   if (i) { 
     sz_bits = 1;

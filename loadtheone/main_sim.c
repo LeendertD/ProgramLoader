@@ -14,15 +14,15 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <stddef.h>
+#include <fcntl.h>
 
 #include <svp/mgsim.h>
-#include <stddef.h>
 #include <svp/abort.h>
 
 #include "ELF.h"
 #include "loader.h"
 
-#include <fcntl.h>
 
 /** \brief Main function, loads based on args.
  * \param argc Amount of arguments
@@ -44,7 +44,7 @@ int main(int argc, char **argv){
     locked_print_string("No file to load\n", 2);
   }
 
-  /** Prints a friendly 'I'll be gone message */
+  /** Prints a friendly 'I'll be gone' message */
   locked_print_string("Returning from Loader main\n", 2);
   return 0;
 }

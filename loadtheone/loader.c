@@ -25,7 +25,7 @@
 #include "basfunc.h"
 #include "extrafuns.h"
 
-/** \brief Parsrs key value pairs.
+/** \brief Parses key value pairs.
  * \param key The named value.
  * \param val The textual value.
  * \param settings Pointer to the value to adjust.
@@ -132,7 +132,7 @@ int read_settings(int fd, struct admin_s *out){
         buff = abuff;
         i = -1;
 
-        //set settin
+        //set setting
         val = parse_setting(abuff, bbuff, &(out->settings), out);
         if (val) return 0;
         abuff[0] = bbuff[0] = 0;
@@ -169,7 +169,7 @@ int read_env(int fd, struct admin_s *out){
   off_t osta = 0;
   off_t oend = 0;
 
-  /**Get needed room, might be more than needed, but is enough
+  /**Get needed space, might be more than needed, but its enough.
   newlines get turned into null's
   comments take no room
   escaped chars take half their file space in memory
@@ -180,7 +180,9 @@ int read_env(int fd, struct admin_s *out){
   //oend = lseek(fd, 0, SEEK_END);
   //lseek(fd, osta, SEEK_SET);
   osta = 0;
-  oend = 1024*1024; // Ugly fix, no seek?
+
+  /** At the time of writing seek lacked implementation, TODO */
+  oend = 1024*1024;
   out->envp = malloc(2 + (oend - osta));
 
   while (b){
@@ -335,7 +337,7 @@ void elf_fromconf(int fd){
     if (params.verbose > VERB_ERR){
       locked_print_string("No filename in config to run\n", PRINTERR);
     }
-#endif
+#endif /* ENABLE_DEBUG */
 
     return;
   }
@@ -345,7 +347,7 @@ void elf_fromconf(int fd){
     if (params.verbose > VERB_ERR){
       locked_print_string("Problems reading env from config\n", PRINTERR);
     }
-#endif
+#endif /* ENABLE_DEBUG */
 
     return;
   }
@@ -370,7 +372,7 @@ void elf_fromconfname(const char *fn){
   char buff[2048];
   snprintf(buff, 2047,"Program from config %s\n", fn);
   locked_print_string(buff, PRINTERR);
-#endif
+#endif /* ENABLE_DEBUG */
 
   elf_fromconf(fd);
   close(fd);
@@ -381,6 +383,7 @@ void elf_fromconfname(const char *fn){
  * handling.
  * \param msg UNUSED could be used to print information
  * \return How the breakpoint was handled HANDLED_USER for now.
+ * TODO
  **/
 enum handled_by elf_clientbreakpoint(int id, const char *msg){
   STEP();
