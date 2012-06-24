@@ -15,28 +15,32 @@
  * \brief Map with PID owning the memory.
  **/
 #define MGSCTL_MEM_MAP_WITH_PID 2
-#endif
+#endif /* MGSCTL_MEM_MAP_WITH_PID */
+
+
 #ifndef MGSCTL_MEM_EXTRA 
 /**
  * Parameter for Control signal.
  * \brief PID related control.
  **/
 #define MGSCTL_MEM_EXTRA 3
-#endif
+#endif /* MGSCTL_MEM_EXTRA */
+
 #ifndef MGSCTL_MEM_EXTRA_SETPID
 /**
  * Parameter for Control signal.
  * \brief PID related control.
  **/
 #define MGSCTL_MEM_EXTRA_SETPID 0
-#endif
+#endif /* MGSCTL_MEM_EXTRA_SETPID */
+
 #ifndef MGSCTL_MEM_EXTRA_UNMAP_BY_PID
 /**
  * Parameter for Control signal.
  * \brief PID related control, deallocation by owner.
  **/
 #define MGSCTL_MEM_EXTRA_UNMAP_BY_PID 1
-#endif
+#endif /* MGSCTL_MEM_EXTRA_UNMAP_BY_PID */
 
 /**
  * Signal a breakpoint, which in interactive simulator mode might be continued
@@ -95,4 +99,4 @@ mgsim_control((Pid),  MGSCTL_TYPE_MEM, MGSCTL_MEM_EXTRA, MGSCTL_MEM_EXTRA_SETPID
 (mgsim_control((Pid),  MGSCTL_TYPE_MEM, MGSCTL_MEM_EXTRA, MGSCTL_MEM_EXTRA_UNMAP_BY_PID))
 
 
-#endif
+#endif /* H_XDNO */

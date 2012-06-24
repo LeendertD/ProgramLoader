@@ -41,10 +41,6 @@ enum e_perms {
 void* reserve_range(void *addr, size_t bytes, enum e_perms perm, long pid);
 int reserve_cancel_pid(long pid);
 
-//void patcher_zero(char *start, size_t size);
-//void patcher_patch(char *start, size_t count, char *src, size_t len);
-//
-
 /**
  * \param a First string.
  * \param b Second string.

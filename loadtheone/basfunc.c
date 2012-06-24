@@ -63,7 +63,7 @@ size_t bytes_from_bits(size_t bits){
 #ifndef maxpagebits
 /** Maximum bits page width*/
 #define maxpagebits ((size_t)  19)
-#endif
+#endif /*maxpagebits*/
 
 /** Minimum number of bytes in a page */
 static const size_t minpagebytes = (size_t)1 << minpagebits; 
@@ -170,7 +170,10 @@ void* reserve_range(void *addr, size_t bytes, enum e_perms perm, long pid){
     resc += 1 << sz_bits;
   }
 
-  /**What protection is wanted is told in perms, however, setting these... TODO*/
+  /**
+   * What protection is wanted is told in perms, however, setting these...
+   * TODO
+   * */
   //mprotect(startaddr, bytes, PROT_NONE);
   return addr + resc;
 }
@@ -228,13 +231,6 @@ sl_enddef
  */
 int function_spawn(main_function_t * main_f,
                     struct admin_s *params){
-  // Placeholder for function argument determination
-  //char *argv[] = {strdup("a.out"), strdup("HOI"), 0};
-  //int argc = 2;
-  //uint32_t env = 0x00000000;
-  //char *envp = (char*) (&env);
-  
-
   // optie 1 (synchroon):
   //sl_create( , , , , , , , thread_function, 
   //         sl_glarg(main_function_t* ,, main_f),
@@ -379,5 +375,4 @@ int streq(const char *a, const char *b){
   while (((a[i]) == (b[i])) && a[i]) i++;
   return (a[i]) == (b[i]);
 }
-
 
