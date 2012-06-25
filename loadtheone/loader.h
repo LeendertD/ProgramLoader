@@ -13,8 +13,6 @@
 #include <svp/abort.h>
 #include "ELF.h"
 #include "loader_api.h"
-//
-//
 
 /** Verbosity for errors */
 #define VERB_ERR 0

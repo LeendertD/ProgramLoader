@@ -363,6 +363,9 @@ struct Elf_Rela {
   Elf_Sword r_addend;
 };
 
+/* Leendert van Duijn:
+ * These are used for ELF parsing
+ * */
 //As defined on page 1-22 Book 1 ELF
 //BSD CORRECTIONS
 #define ELF_REL_SYM(i) ((i) >> 32)
@@ -403,7 +406,6 @@ struct Elf_Sym {
 #define ELF_RR_RELATIVE 27
 #define ELF_RR_GLOBDAT 25
 #define ELF_RR_JMPSLOT 26
-
 
 const char * elf_symname(Elf_Addr base,struct Elf_Shdr *, struct Elf_Sym* sym, struct Elf_Ehdr *ehdr);
 const char *elf_sectname(Elf_Addr base, int num,struct Elf_Ehdr *ehdr);
