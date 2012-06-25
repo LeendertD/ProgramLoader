@@ -17,4 +17,3 @@ sim_out: $(SIMC) $(SIMH)
 	$(SLC) $(CFLAGS) -b mta $(SIMC) -o sim_out
 run: sim_out
 	$(SLR) sim_out sim_testprog 2> ll
-
