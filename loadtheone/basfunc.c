@@ -80,6 +80,12 @@ static const size_t maxpagebytes = (size_t)1 << maxpagebits;
  * \return 0 on success, -1 on invalid parameters
  * */
 sl_def(lockme_reserve_single,, sl_glparm(void*, addr),sl_glparm(size_t, sz_bits), sl_glparm(long, pid) ){
+  /**
+   * A worthwhile investment might be COW zero filled pages, allowing fast
+   * allocation of meory voiding the need to manually fill it with nullbytes,
+   * which is required by, at the least, ELF loading
+   * */
+
   void *addr = sl_getp(addr);
   size_t sz_bits = sl_getp(sz_bits);
   long pid = sl_getp(pid);

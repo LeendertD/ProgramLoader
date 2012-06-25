@@ -1,0 +1,229 @@
+* input data: env at 0x43000000, 3830 bytes. [+29367]
+* strings at 0x80000010, environ[63] at 0x80000f10. [+30417]
+* heap at 0x80000000, 10737418240 bytes. [+351]
+* input data: fibre at 0x80001140, 32 bytes. [+1479]
+* input data: slr vars at 0x80001118, 16 bytes. [+866]
+* connected to I/O, 16 devices, 8 notification channels. [+767]
+* smc at 0x4e000000, enumerates 15 devices. [+513]
+* I/O enumeration data at 0x10000000. [+1282]
+* uart at 0x44000000. [+1217]
+* rpc interface at 0x45000000. [+608]
+* lcd at 0x46000000, size 80x25. [+453]
+* lcd at 0x47000000, size 16x2. [+369]
+* rtc at 0x48000000. [+306]
+* gfxctl at 0x49000000, framebuffer at 0x4a000000. [+613]
+* argument ROM at 0x4c000000. [+815]
+* configuration ROM at 0x4d000000. [+527]
+* input data: arguments at 0x80001168, argv[2] at 0x800011a8, 50 bytes. [+2920]
+* reading configuration...
+  - core frequency: 1000MHz.
+  - 256 thread and 32 family entries per core.
+  - system version: 3.2.61-d2aa8.
+  - master frequency: 4000MHz.
+  done. [+244807]
+* SEP init: setting up for 128 cores...  done. [+2682]
+* allocating places for the C stdlib... success: stdio at 0x103, malloc at 0x105, dtoa at 0x107 [+2658]
+* -n 1 -> request to SEP... success, t_main goes to pid=0x109 [+7703]
+* init compiled with slc 3.7b.40-c437a2.
+
+Microgrid says:  h e l l o  w o r l d !
+
+init done, program will start now; core cycles so far: 348937
+Program from config ./cfg/tiny.cfg
+Warning verbosity set to quite high
+Loading ../loadable/tinyex_arg_shared
+File opened
+File read
+Closing file
+base_file: 0x0
+base_used: 0x8000000000000
+Trying to load program: 0x801011d8 size 0x11078 @ 0x8000000000000
+load : 1_0: size 0x5b8,0x5b8 @ 0x8000000000000 with 1
+Loader 0x5b8 bytes loaded at 0x8000000000000, of which 0x0 void
+load : 1_1: size 0x490,0x490 @ 0x8000001000000 with 5
+Loader 0x490 bytes loaded at 0x8000001000000, of which 0x0 void
+load : 1_2: size 0x81d0,0x1c0 @ 0x8000001010490 with 7
+Loader 0x1c0 bytes loaded at 0x8000001010490, of which 0x8010 void
+Loaded microthreaded ELF binary with virtual base 0x8000000000000 entry point 0x8000001000344
+Got 21 sections of size 64 each Expecting size 64
+Stringtable in section 18
+
+Section   #(    Type):            Name, Type#          Flags,          Addr,           Off,          Size,   Link,  Info,          Align,       Entsize
+Section   0(NULLTYPE):                ,     0,              0,             0,             0,             0,      0,     0,              0,             0
+Section   1(Progbits):           .text,     1,              6,      16777216,         65536,           896,      0,     0,             64,             0
+Section   2(    Hash):           .hash,     5,              2,           400,           400,           328,      3,     0,              8,             8
+Section   3(  Dynsym):         .dynsym,    11,              2,           728,           728,           336,      4,     1,              8,            24
+Setting (Dyn)symbol pointer
+Sym   0:                (0)               0x0 of size     0,   0< 0, 0>   0,        0
+Sym   1:              bp(2)         0x1000004 of size    76,  18< 1, 2> 136,        1
+Envroom: __loader_room_env@0x1014660<0x4000>--> 0x8000001014660
+Sym   2: __loader_room_env(65)         0x1014660 of size 16384,  17< 1, 1>   0,       16
+Argroom: __loader_room_argv@0x1010660<0x4000>--> 0x8000001010660
+Sym   3: __loader_room_argv(46)         0x1010660 of size 16384,  17< 1, 1>   0,       16
+Sym   4:          _start(95)         0x1000344 of size    44,  18< 1, 2> 136,        1
+Sym   5:            strs(41)         0x10105e8 of size    56,  17< 1, 1>   0,       12
+Sym   6: dudewheresmycard(5)         0x1000084 of size     8,  18< 1, 2> 128,        1
+Sym   7:     __bss_start(90)         0x1010650 of size     0,  16< 1, 0>   0,    65521
+Sym   8:    iaintfoundit(22)         0x10000c4 of size    44,  18< 1, 2> 136,        1
+Sym   9:             lbp(1)         0x1010658 of size     8,  17< 1, 1>   0,       15
+Sym  10:          _edata(83)         0x1010650 of size     0,  16< 1, 0>   0,    65521
+Sym  11:            _end(102)         0x1018660 of size     0,  16< 1, 0>   0,    65521
+Sym  12:           lmain(35)         0x1000104 of size   516,  18< 1, 2> 136,        1
+Sym  13:               a(88)         0x1010648 of size     8,  17< 1, 1>   0,       14
+Section   4(  Strtab):         .dynstr,     3,              2,          1064,          1064,           107,      0,     0,              1,             0
+Section   5(    Rela):       .rela.dyn,     4,              2,          1176,          1176,           240,      3,     0,              8,            24
+Found RELA section
+Section   6(    Rela):       .rela.plt,     4,              2,          1416,          1416,            48,      3,    11,              8,            24
+Found RELA section
+Section   7(Progbits):         .rodata,     1,             50,      16778112,         66432,            76,      0,     0,              1,             1
+Section   8(Progbits):   .eh_frame_hdr,     1,              2,      16778188,         66508,            52,      0,     0,              4,             0
+Section   9(Progbits):       .eh_frame,     1,              2,      16778240,         66560,           144,      0,     0,              8,             0
+Section  10( Dynamic):        .dynamic,     6,              3,      16843920,         66704,           288,      4,     0,              8,            16
+Section  11(Progbits):            .plt,     1,              7,      16844208,         66992,            56,      0,     0,             16,             0
+Section  12(Progbits):           .data,     1,              3,      16844264,         67048,            56,      0,     0,              8,             0
+Section  13(Progbits):            .got,     1,              3,      16844320,         67104,            40,      0,     0,              8,             0
+Section  14(Progbits):          .sdata,     1,      268435459,      16844360,         67144,             8,      0,     0,              8,             0
+Section  15(  Nobits):           .sbss,     8,      268435459,      16844368,         67152,            16,      0,     0,              8,             0
+Section  16(  Nobits):            .bss,     8,              3,      16844384,         67152,         32768,      0,     0,              1,             0
+Section  17(Progbits):        .comment,     1,              0,             0,         67152,            72,      0,     0,              1,             0
+Section  18(  Strtab):       .shstrtab,     3,              0,             0,         67224,           154,      0,     0,              1,             0
+Section  19(  Symtab):         .symtab,     2,              0,             0,         68728,           840,     20,    22,              8,            24
+Sym   0:                (0)               0x0 of size     0,   0< 0, 0>   0,        0
+Sym   1:                (0)         0x1000000 of size     0,   3< 0, 3>   0,        1
+Sym   2:                (0)             0x190 of size     0,   3< 0, 3>   0,        2
+Sym   3:                (0)             0x2d8 of size     0,   3< 0, 3>   0,        3
+Sym   4:                (0)             0x428 of size     0,   3< 0, 3>   0,        4
+Sym   5:                (0)             0x498 of size     0,   3< 0, 3>   0,        5
+Sym   6:                (0)             0x588 of size     0,   3< 0, 3>   0,        6
+Sym   7:                (0)         0x1000380 of size     0,   3< 0, 3>   0,        7
+Sym   8:                (0)         0x10003cc of size     0,   3< 0, 3>   0,        8
+Sym   9:                (0)         0x1000400 of size     0,   3< 0, 3>   0,        9
+Sym  10:                (0)         0x1010490 of size     0,   3< 0, 3>   0,       10
+Sym  11:                (0)         0x10105b0 of size     0,   3< 0, 3>   0,       11
+Sym  12:                (0)         0x10105e8 of size     0,   3< 0, 3>   0,       12
+Sym  13:                (0)         0x1010620 of size     0,   3< 0, 3>   0,       13
+Sym  14:                (0)         0x1010648 of size     0,   3< 0, 3>   0,       14
+Sym  15:                (0)         0x1010650 of size     0,   3< 0, 3>   0,       15
+Sym  16:                (0)         0x1010660 of size     0,   3< 0, 3>   0,       16
+Sym  17:                (0)               0x0 of size     0,   3< 0, 3>   0,       17
+Sym  18:         id.1396(1)         0x1010650 of size     4,   1< 0, 1>   0,       15
+Sym  19:        _DYNAMIC(9)         0x1010490 of size     0,   1< 0, 1>   2,    65521
+Sym  20: _PROCEDURE_LINKAGE_TABLE_(18)         0x10105b0 of size     0,   1< 0, 1>   2,    65521
+Sym  21: _GLOBAL_OFFSET_TABLE_(44)         0x1010620 of size     0,   1< 0, 1>   2,    65521
+Sym  22:              bp(66)         0x1000004 of size    76,  18< 1, 2> 136,        1
+Envroom: __loader_room_env@0x1014660<0x4000>--> 0x8000001014660
+Sym  23: __loader_room_env(69)         0x1014660 of size 16384,  17< 1, 1>   0,       16
+Argroom: __loader_room_argv@0x1010660<0x4000>--> 0x8000001010660
+Sym  24: __loader_room_argv(87)         0x1010660 of size 16384,  17< 1, 1>   0,       16
+Sym  25:          _start(106)         0x1000344 of size    44,  18< 1, 2> 136,        1
+Sym  26:            strs(113)         0x10105e8 of size    56,  17< 1, 1>   0,       12
+Sym  27: dudewheresmycard(118)         0x1000084 of size     8,  18< 1, 2> 128,        1
+Sym  28:     __bss_start(135)         0x1010650 of size     0,  16< 1, 0>   0,    65521
+Sym  29:    iaintfoundit(147)         0x10000c4 of size    44,  18< 1, 2> 136,        1
+Sym  30:             lbp(160)         0x1010658 of size     8,  17< 1, 1>   0,       15
+Sym  31:          _edata(164)         0x1010650 of size     0,  16< 1, 0>   0,    65521
+Sym  32:            _end(171)         0x1018660 of size     0,  16< 1, 0>   0,    65521
+Sym  33:           lmain(176)         0x1000104 of size   516,  18< 1, 2> 136,        1
+Sym  34:               a(182)         0x1010648 of size     8,  17< 1, 1>   0,       14
+Section  20(  Strtab):         .strtab,     3,              0,             0,         69568,           184,      0,     0,              1,             0
+Rela:: 0x10105e8, (+0x1000397), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x1000397 <a:0x1000397 Symv:0x0> @0x1000397 to 0x8000001000397
+Rela:: 0x10105f0, (+0x100039c), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x100039c <a:0x100039c Symv:0x0> @0x100039c to 0x800000100039c
+Rela:: 0x10105f8, (+0x10003a1), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x10003a1 <a:0x10003a1 Symv:0x0> @0x10003a1 to 0x80000010003a1
+Rela:: 0x1010600, (+0x10003a5), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x10003a5 <a:0x10003a5 Symv:0x0> @0x10003a5 to 0x80000010003a5
+Rela:: 0x1010608, (+0x10003aa), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x10003aa <a:0x10003aa Symv:0x0> @0x10003aa to 0x80000010003aa
+Rela:: 0x1010610, (+0x10003b6), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x10003b6 <a:0x10003b6 Symv:0x0> @0x10003b6 to 0x80000010003b6
+Rela:: 0x1010648, (+0x10003c5), 0x1b: 27, 0
+Changing Rel '' Size 0: 0x10003c5 <a:0x10003c5 Symv:0x0> @0x10003c5 to 0x80000010003c5
+Rela:: 0x1010620, (+0x0), 0x500000019: 25, 5
+Changing Glob 'strs' Size 56: 0x10105e8 <a:0x0 Symv:0x10105e8> @0x10105e8 to 0x80000010105e8
+Rela:: 0x1010630, (+0x0), 0x900000019: 25, 9
+Changing Glob 'lbp' Size 8: 0x1010658 <a:0x0 Symv:0x1010658> @0x1010658 to 0x8000001010658
+Rela:: 0x1010640, (+0x0), 0xd00000019: 25, 13
+Changing Glob 'a' Size 8: 0x1010648 <a:0x0 Symv:0x1010648> @0x1010648 to 0x8000001010648
+Rela:: 0x1010628, (+0x0), 0x60000001a: 26, 6
+Changing Jmpslot 'dudewheresmycard' Size 8: 0x10105d0 <a:0x0 Symv:0x1000084> @0x10105d0 to 0x8000001000084
+Rela:: 0x1010638, (+0x0), 0xc0000001a: 26, 12
+Changing Jmpslot 'lmain' Size 516: 0x10105dc <a:0x0 Symv:0x1000104> @0x10105dc to 0x8000001000104
+Argroom needed 60, 16384 available
+Envroom needed 5, 16384 available
+Spawning program from 0x801011d8 of size 0x11078 with flags 4
+To cores: 1 @ 0
+00080000010003c5hello world
+21684438416860768Returning from Loader main
+0#
+'0008000001000397
+'Hoi '...
+1#
+'000800000100039c
+'dit '...
+2#
+'00080000010003a1
+'is '...
+3#
+'00080000010003a5
+'een '...
+4#
+'00080000010003aa
+'programma, '...
+5#
+'00080000010003b6
+'of niet soms?
+'...
+Program with main@0x8000001000344 terminated with 0
+
+<Clocks>1,0,1,502802,1459804,2379346,2384088</Clocks>
+### begin end-of-simulation statistics
+11588132	# master cycle counter
+2897033	# core cycle counter
+1046604	# total executed instructions
+0	# total issued fp instructions
+## core statistics:
+# P  iops      flops     lds       sts       ibytes    obytes    regf_act plbusy    plstgs    plstgrun  pl%busy  pl%eff   ttmax     ttotal    ttsize    tt%occ   ftmax     ftotal    ftsize    ft%occ   xqmax     xqtot     xqavg        
+# per-core values
+0    517185    0         38626     42767     222581    268156    0.6      1323642   6         3506360   44.2     17.9     3         11676576  256       0.4      3         11697208  32        3.2      1         2023592   1.746262e-01 
+1    484524    0         77799     47223     431221    255769    0.0      992678    6         3123295   52.4     16.7     1         4799420   256       0.2      1         4823008   32        1.3      1         11549768  9.966894e-01 
+2    44852     0         11074     36        11360     288       0.0      122453    6         303292    41.3     1.5      1         545008    256       0.0      1         566108    32        0.2      1         11583552  9.996048e-01 
+3    43        0         5         8         28        40        0.0      107       6         304       47.4     0.0      1         1664      256       0.0      1         3408      32        0.0      1         11587716  9.999641e-01 
+# cumulative - all active cores
+4    1046604   0         127504    90034     665190    524253    0.7      2438880   24        6933251   185.2    36.1     6         17022668  1024      0.6      6         17089732  128       4.6      4         36744628  3.170885e+00 
+# average per core = cumulative/4
+4    261651.00 0.00      31876.00  22508.50  166297.50 131063.25 0.2      609720.00 6.00      1733312.75 46.3     9.0      1.50      4255667.00 256.00    0.1      1.50      4272433.00 32.00     1.2      1.00      9186157.00 7.927212e-01 
+## descriptions:
+# P: core ID / number of active cores
+# iops: number of instructions executed
+# flops: number of floating-point instructions issued
+# lds: number of load instructions executed
+# sts: number of store instructions executed
+# ibytes: number of bytes loaded from L1 cache into core
+# obytes: number of bytes stored into L1 cache from core
+# regf_act: register file async port activity (= 100. * ncycles_asyncport_busy / ncorecycles_total)
+# plbusy: number of corecycles the pipeline was active
+# plstgs: number of pipeline stages
+# plstgrun: cumulative number of corecycles active in all pipeline stages
+# pl%busy: pipeline efficiency while active (= 100. * plstgrun / plstgs / plbusy)
+# pl%eff: pipeline efficiency total (= 100. * iops / ncorecycles_total)
+# ttmax: maximum of thread entries simulatenously allocated
+# ttotal: cumulative number of thread entries busy (over mastertime)
+# ttsize: thread table size
+# tt%occ: thread table occupancy (= 100. * ttotal / ttsize / nmastercycles_total)
+# ttmax: maximum of family entries simulatenously allocated
+# ftotal: cumulative number of family entries busy (over mastertime)
+# ftsize: family table size
+# ft%occ: family table occupancy (= 100. * ftotal / ftsize / nmastercycles_total)
+# xqmax: high water mark of the exclusive allocate queue size
+# xqtot: cumulative exclusive allocate queue size (over mastertime)
+# xqavg: average size of the exclusive allocate queue (= xqtot / nmastercycles_total)
+## memory statistics:
+38160	# number of load reqs. by the L1 cache from L2
+2442240	# number of bytes loaded by the L1 cache from L2
+91626	# number of store reqs. by the L1 cache to L2
+731561	# number of bytes stored by the L1 cache to L2
+7061	# number of cache lines read from the ext. mem. interface
+4880	# number of cache lines written to the ext. mem. interface
+### end end-of-simulation statistics

@@ -1,0 +1,16 @@
+#!/bin/sh
+rm -f ./logs/*.log
+slr sim_out ./cfg/bulknull.cfg &> ./logs/nulls.log   &
+slr -m rbm128 sim_out ./cfg/bulknull.cfg &> ./logs/nulls_noL2.log   &
+slr -m rbm128 sim_out ./cfg/bulksec.cfg &> ./logs/bulksec_noL2.log   &
+slr sim_out ./cfg/bulksec.cfg   &>  ./logs/bulksec.log &
+slr sim_out ./cfg/bulktest.cfg  &>  ./logs/bulktest.log&
+slr sim_out ./cfg/cory.cfg      &>  ./logs/cory.log    &
+slr sim_out ./cfg/funn.cfg      &>  ./logs/funn.log    &
+slr sim_out ./cfg/printy.cfg    &>  ./logs/printy.log  &
+slr sim_out ./cfg/shared.cfg    &>  ./logs/shared.log  &
+slr sim_out ./cfg/sparmy.cfg    &>  ./logs/sparmy.log  &
+slr sim_out ./cfg/spawny.cfg    &>  ./logs/spawny.log  &
+slr -m rbm128 sim_out ./cfg/sparmy.cfg    &>  ./logs/sparmy_noL2.log &
+slr sim_out ./cfg/tiny.cfg      &>  ./logs/tiny.log   &
+slr sim_out ./cfg/tshared.cfg   &>  ./logs/tshared.log&
