@@ -16,6 +16,7 @@ clean:
 	$(CLEANONE) sparmy
 	$(CLEANONE) null
 	$(CLEANONE) sec
+	$(CLEANONE) hworld
 
 crt_fun.o: crt_fun.c
 	$(CC) $(CFLAGS) -c $<
